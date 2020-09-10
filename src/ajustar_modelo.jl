@@ -132,7 +132,7 @@ Devuelve los indices asociados a las distintas clases socioeconómicas en la mat
 - `clase_alta`
 """
 function index_clases()
-    clase_baja = [1 2 7 8 13 14]
+    clase_baja = [1,2,7,8,13,14]
     clase_media = clase_baja .+ 2
     clase_alta = clase_media .+ 2
     return clase_baja, clase_media, clase_alta
@@ -169,18 +169,18 @@ end
 joven, adulto, mayor = index_edad()
 hombre, mujer = index_sexo()
 clase_baja, clase_media, clase_alta = index_clases()
-P, total_por_clase, nombre_ambientes, nombre_clases = readp("../results/Pdata.mat")
+P, total_por_clase, nombre_ambientes, nombre_clases = read_matlab_data("../results/Pdata.mat")
 suma_uno_por_fila!(P)
 P2 = reducir_movilidad(P)
 ## Definir
-nclases = length(nombre_clases)
-nambientes = length(nombre_ambientes)
+n_clases = length(nombre_clases)
+m_ambientes = length(nombre_ambientes)
 
-s = 1:nclases
-e = nclases+1:2*nclases
-im = 2*nclases+1:3*nclases
-i = 3*nclases+1:4*nclases
-r = 4*nclases+1:5*nclases
+s = 1:n_clases
+e = n_clases+1:2*n_clases
+im = 2*n_clases+1:3*n_clases
+i = 3*n_clases+1:4*n_clases
+r = 4*n_clases+1:5*n_clases
 
 
 
@@ -212,11 +212,11 @@ end;
 
 
 ## Condiciones iniciales y parametros
-e0 = 5.0*ones(nclases)
-i0 = zeros(nclases)
-im0 = zeros(nclases)
+e0 = 5.0*ones(n_clases)
+i0 = zeros(n_clases)
+im0 = zeros(n_clases)
 s0 = (total_por_clase - i0)
-r0 = zeros(nclases)
+r0 = zeros(n_clases)
 
 u0 = ComponentArray(S = s0, E = e0, Im = im0, I = i0, R = r0)
 tspan = (0.0,200.0)
@@ -238,10 +238,10 @@ filename = replace(filename, "." => "-")
 println(filename)
 
 β = beta*[0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
-ν = nu*ones(nclases)
+ν = nu*ones(n_clases)
 φ = phi
-γ = gi*ones(nclases)
-γₘ = gm*ones(nclases)
+γ = gi*ones(n_clases)
+γₘ = gm*ones(n_clases)
 p1 = (a, β, ν, φ, γ, γₘ, P)
 p2 = (a, β, ν, φ, γ, γₘ, P2)
 
@@ -281,7 +281,7 @@ plot_comparesols_grouping_and_save(
     (sol1, sol2),
     (i[joven], i[adulto], i[mayor]),
     ["Jóvenes", "Adultos", "Adulto Mayor"],
-    "Infectados por edad, reduciendo movilidad",
+    "Cambio en los Infectados al reducir movilidad, por edad.",
     output_folder * "I_edad_mov_reducidad$filename.png"
 )
 
@@ -289,11 +289,19 @@ plot_comparesols_grouping_and_save(
     (sol1, sol2),
     (i[clase_baja], i[clase_media], i[clase_alta]),
     ["Nivel bajo", "Nivel medio", "Nivel alto"],
-    "Infectados por nivel socioeconómico, reduciendo movilidad",
+    "Cambio en los Infectados al reducir movilidad, \npor nvl socioeconómico.",
     output_folder * "I_nvlsocio_mov_reducidad$filename.png"
 )
 
-sols = 1
+plot_comparesols_grouping_and_save(
+    (sol1, sol2),
+    (i[hombre], i[mujer]),
+    ["Hombre", "Mujer"],
+    "Cambio en los Infectados al reducir movilidad, por sexo.",
+    output_folder * "I_sexo_mov_reducidad$filename.png"
+)
+
+
 #palette = get_color_palette(:gnuplot2, 18) #.colors.colors[1:5:86]
 plot(title = "Susceptibles")
 for k in s
@@ -409,10 +417,10 @@ println(filename)
 plot(xlabel = "t")
 #for a in 0.2:0.2:0.8
 #β = beta*[0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
-#ν = nu*ones(nclases)
+#ν = nu*ones(n_clases)
 #φ = phi
-#γ = gi*ones(nclases)
-#γₘ = gm*ones(nclases)
+#γ = gi*ones(n_clases)
+#γₘ = gm*ones(n_clases)
 p = (a, β, ν, φ, γ, γₘ, P2)
 
 ### Resolver
