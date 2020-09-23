@@ -129,8 +129,7 @@ Por defecto se grafica para todas las clases.
 # Argumentos:
 - `sol`: solucion a una ecuación diferencial, usando DifferentialEquations.solve.
 - `n_clases`: numero total de clases consideradas en el modelo
-- `filename::String`: archivo de salida, incluyendo el directorio y formato
-    (`.png`, `.pdf`, etc).
+- `nombre_clases`: vector de largo `n_clases` con los nombres de todas las clases.
 - `indexs`: opcional, por defecto 1:18.
 Indices de las clases que quieren graficarse. Deben ser valores entre 1 y n_clases.
 # Ejemplos:
@@ -139,11 +138,10 @@ Indices de las clases que quieren graficarse. Deben ser valores entre 1 y n_clas
 plot_all_states_and_save(sol, 18, "../img/all_states.png";indexs = 1:18)
 ```
 """
-function plot_all_states_and_save(sol, n_clases, filename;indexs = 1:18)
-
+function plot_all_states_and_save(sol, n_clases, nombre_clases ;indexs = 1:n_clases)
     s, e, im, i, r = index_estados(n_clases)
-    estados = index_estados(n_clases)
-
+    #estados = index_estados(n_clases)
+    labels = reshape(nombre_clases[indexs], (1,length(indexs)))
     l2 = @layout [grid(2,3) a{0.18w}]
     p = plot(
         plot(sol, vars = (0,s[indexs]), title = "Susceptibles", label = false),
@@ -153,11 +151,12 @@ function plot_all_states_and_save(sol, n_clases, filename;indexs = 1:18)
         plot(sol, vars = (0,r[indexs]), title = "Removidos", legend = false),
         #plot(sol, vars = (0,d), title = "Muertos", legend = false),
         plot(),
-        plot(sol, vars = (0,s[indexs]), label = nombre_clases, grid = false, showaxis = false, xlim = (-10,-1), xlabel = ""),
+        plot(sol, vars = (0,s[indexs]), label = labels, grid = false, showaxis = false, xlim = (-10,-1), xlabel = ""),
         #plot(sol, vars = (0,s), bar_position=:stack, label=nombre_clases, grid=false, showaxis=false),
         layout = l2, size=(600,400)
     )
-    savefig(p, filename)
+    return p
+    #savefig(p, filename)
 end
 
 """
