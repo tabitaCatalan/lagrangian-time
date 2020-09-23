@@ -1,7 +1,7 @@
-"""
+#=
 Este archivo contiene funciones para generar plots interesantes a partir de
 soluciones de `EpidemicModel.jl`.
-"""
+=#
 
 using Plots
 
@@ -76,7 +76,7 @@ de la primera solucion en colores más intensos. Guarda la solucion.
 ```julia
 plot_compare_function_of_sols_grouping(
     (sol1, sol2),
-    (joven, adulto, mayor), # índices de clases jóvenes, adultos y mayores.
+    (clase_baja, clase_media, clase_alta), # índices de clases jóvenes, adultos y mayores.
     incidencia_por_clase;
     labels_grupos = ["Nvl. bajo" "Nvl. medio" "Nvl. alto"],
     title = "Cambio en la incidencia, por nvl socioeconómico",
@@ -84,13 +84,13 @@ plot_compare_function_of_sols_grouping(
 )
 ```
 """
-function plot_compare_function_of_sols_grouping(sols, index_grupos, a_function;
-    labels_grupos, title="", kwargs...)
+function plot_compare_function_of_sols_grouping(sols, index_grupos, a_function; labels_grupos, title="", kwargs...)
     L = length(sols)
     a_plot = plot(title=title)
     for k in 1:length(index_grupos)
         for l in 1:L-1
-            plot!(a_plot, sols[l].t, a_function(sols[l],index_grupos[k]; kwargs...), color = k, alpha = calcular_alpha(l,L), label = :none)
+            α = calcular_alpha(l,L)
+            plot!(a_plot, sols[l].t, a_function(sols[l],index_grupos[k]; kwargs...), color = k, alpha = α, label = :none)
         end
         plot!(a_plot, sols[end].t,  a_function(sols[end],index_grupos[k]; kwargs...), color = k, label = labels_grupos[k])
     end
@@ -110,31 +110,16 @@ function calcular_alpha(l, L)
     min_alpha = 0.3
     max_alpha = 1.0
     slope = (max_alpha-min_alpha)/(L-1)
-    return slope(l-1) + min_alpha
+    return slope*(l-1) + min_alpha
 end
 
-plot_compare_function_of_sols_grouping(
-    (sol1, sol2),
-    index_grupo,
-    incidencia_por_clase;
-    title = "Cambio en la incidencia, por nvl socioeconómico",
-    labels_grupos = ["Nvl. bajo" "Nvl. medio" "Nvl. alto"],
-    total_por_clase = total_por_clase
-)
-
-function incidencia_por_clase(sol, index_clase; total_por_clase)
-    i = 3*n_clases+1:4*n_clases
-    return sum(sol'[:, i[index_clase]], dims = 2)/sum(total_por_clase[index_clase])
+function incidencia_por_clase(sol, index_clase; estado, total_por_clase)
+    return sum(sol'[:, estado[index_clase]], dims = 2)/sum(total_por_clase[index_clase])
 end
 
-function total_por_clase(sol, index_clase; estado = 1:18)
+function total_estado_por_clase(sol, index_clase; estado = 1:18)
     return sum(sol'[:, estado[index_clase]], dims = 2)
 end
-
-
-
-
-
 
 
 """
@@ -193,16 +178,13 @@ function plot_nuevos_contagios(sol, filename)
     savefig(p, filename)
 end
 
-function plot_total_nuevos_contagios(sol, filename)
-
-end
-
 """
     index_estados(n_clases)
 Devuelve una tupla con los índices asociados a cada uno de los estados del modelo.
 # Ejemplos
 ```julia
-julia> index_estados(3)
+julia> s, e, im, i, r = index_estados(3)
+(1:3, 4:6, 7:9, 10:12, 13:15)
 ```
 """
 function index_estados(n_clases)

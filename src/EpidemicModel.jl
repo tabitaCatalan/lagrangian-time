@@ -1,7 +1,7 @@
-"""
+#=
 Este archivo contien el modelo a usar para modelar la epidemia (SEIIᵐR).
 Incluye además funciones para leer datos desde MATLAB.
-"""
+=#
 
 ## Importar dependencias
 using MAT
