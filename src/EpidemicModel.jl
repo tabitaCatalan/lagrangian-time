@@ -237,7 +237,7 @@ end
 
 """
     make_filename(a, beta, nu, phi, gi, gm)
-Devuelve un String que puede usarse para nombrar archivos, y que incluye 
+Devuelve un String que puede usarse para nombrar archivos, y que incluye
 los parametros usados. La notación es:
 `_` + nombre del parámetro + valor del parámetro
 Para evitar problemas, se usa `-` como separador decimal.

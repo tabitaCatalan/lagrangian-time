@@ -138,7 +138,7 @@ Indices de las clases que quieren graficarse. Deben ser valores entre 1 y n_clas
 plot_all_states_and_save(sol, 18, "../img/all_states.png";indexs = 1:18)
 ```
 """
-function plot_all_states_and_save(sol, n_clases, nombre_clases ;indexs = 1:n_clases)
+function plot_all_states(sol, n_clases, nombre_clases ;indexs = 1:n_clases)
     s, e, im, i, r = index_estados(n_clases)
     #estados = index_estados(n_clases)
     labels = reshape(nombre_clases[indexs], (1,length(indexs)))
