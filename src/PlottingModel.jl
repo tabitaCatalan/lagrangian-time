@@ -123,7 +123,7 @@ end
 
 
 """
-    plot_all_states_and_save(sol; indexs = 1:18)
+    plot_all_states(sol, n_clases, nombre_clases ;indexs = 1:n_clases)
 Hace una figura, graficando por separado cada estado (S, E, I, etc) c/r al tiempo.
 Por defecto se grafica para todas las clases.
 # Argumentos:
@@ -135,10 +135,10 @@ Indices de las clases que quieren graficarse. Deben ser valores entre 1 y n_clas
 # Ejemplos:
 ```julia
 # supongo que sol es la salida de DifferentialEquations.solve
-plot_all_states_and_save(sol, 18, "../img/all_states.png";indexs = 1:18)
+plot_all_states(sol, 5, ["c1" "c2" "c2" "c4" "c5"]; indexs = 3:5)
 ```
 """
-function plot_all_states(sol, n_clases, nombre_clases ;indexs = 1:n_clases)
+function plot_all_states(sol, n_clases, nombre_clases;indexs = 1:n_clases)
     s, e, im, i, r = index_estados(n_clases)
     #estados = index_estados(n_clases)
     labels = reshape(nombre_clases[indexs], (1,length(indexs)))
@@ -161,20 +161,31 @@ end
 
 """
     plot_nuevos_contagios(sol, filename)
-
+Compara la cantidad de nuevos contagios diarios para varias soluciones.
+Opcionalmente, es posible hacerlo solo para un subconjunto de clases sociales.
+# Argumentos
+- `sols`: tupla o array de soluciones ODEProblem
+- `n_clases`: int
+    Cantidad de clases sociales del modelo
+- `labels`: (opcional) lista de los nombres de cada solución
+- `index_grupo`: UnitRange o Array (opcional)
+    Índices indicando las clases a considerar. Por defecto serán todas (1:`n_clases`).
+- `title`: (opcional) título del gráfico
 """
-function plot_nuevos_contagios(sol, filename)
-    s, = index_estados(n_clases)
-    p = plot(
-        plot(sol.t[2:end], sol'[1:end-1, s] - sol'[2:end, s],
-            title = "Nuevos contagios",
-            #label = nombre_clases,
-            xlabel = "t"),
-        plot(sol.t[2:end], sum(sol'[1:end-1, s] - sol'[2:end, s], dims = 2),
-            title = "Total nuevos contagios", xlabel = "t", legend=:none),
-        layout = (1,2), size=(800,400)
-    )
-    savefig(p, filename)
+function plot_nuevos_contagios(sols, n_clases; labels = ["Solución $i" for i in 1:n_clases], index_grupo = 1:n_clases, title = "")
+    a_plot = plot(title = title, legend = :topleft)
+    for i in 1:length(sols)
+        plot!(a_plot, sols[i].t[2:end],
+            nuevos_contagios(sols[i], n_clases, index_grupo),
+            label = labels[i]
+        )
+    end
+    a_plot
+end
+
+function nuevos_contagios(sol, n_clases, index_grupo)
+    s = 1:n_clases
+    sum(sol'[1:end-1, s[index_grupo]] - sol'[2:end, s[index_grupo]], dims = 2)
 end
 
 """

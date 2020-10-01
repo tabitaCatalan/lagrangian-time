@@ -53,9 +53,9 @@ function suma_uno_por_fila!(P)
 end
 
 """
-    reducir_movilidad(P)
-Reduce el tiempo invertido en los ambientes trabajo, estudios y transporte,
-y lo traspasa al hogar.
+    aplicar_cuarentena!(P)
+Modifica la matriz `P`, reduciendo el tiempo invertido en los ambientes trabajo,
+estudios y transporte, y lo traspasa al hogar.
 El tiempo en el estudio se reduce en un 95% (no en un 100% para evitar que haya
 inestabilidad al resolver la EDO).
 El tiempo en el trabajo se reduce en un 20% para clase baja, 50% para clase media
@@ -100,29 +100,119 @@ Hay 13 ambientes: \n
 11     | Caminata \n
 12     | Bicicleta \n
 13     | Otro
+# Detalles de la implementación
+Se mantiene constante la proporción entre el tiempo gastado en el transporte
+y el tiempo fuera del hogar. Esta proporción se llama δ y se calcula para cada clase.
 """
-function reducir_movilidad(P)
-    tpo_trabajo = P[:,2]
-    clase_baja = [1 2 7 8 13 14]
-    clase_media = clase_baja .+ 2
-    clase_alta = clase_media .+ 2
+function aplicar_cuarentena!(P)
+    δ = calcular_delta(P)
+    reducir_tiempo_trabajo!(P)
+    reducir_tiempo_estudios!(P)
+    corregir_tiempo_transporte!(P, δ)
+end
+
+function cerrar_colegios!(P, δ)
+    reducir_tiempo_estudios!(P)
+    corregir_tiempo_transporte!(P, δ)
+end
+
+function teletrabajo!(P, δ)
+    reducir_tiempo_trabajo!(P)
+    corregir_tiempo_transporte!(P, δ)
+end
+
+"""
+    calcular_delta(P)
+Calcula la relación entre el tiempo gastado en el transporte  y el tiempo en los
+lugares fuera del hogar (que no incluyan transporte), para cada clase.
+# Argumentos
+- `P`: Array de dim = 2
+    Matriz de movilidad
+"""
+
+function calcular_delta(P)
+    hogar = 1:1
+    transporte = 9:12
+    lugares_fuera_del_hogar = [collect(2:8); 13]
+    δ = sum(P[:,transporte], dims = 2)./sum(P[:,lugares_fuera_del_hogar], dims = 2)
+    δ
+end
+
+
+"""
+    corregir_tiempo_transporte!(P, δ)
+Suponemos que el tiempo en los ambientes fuera del hogar (sin incluir transporte)
+se han reducido. Se reducirá el tiempo en el transporte, procurando mantenar la
+proporción de estos tiempos constante (δ, calcuda previamente)
+# Argumentos
+- `P`:
+- `δ`:
+# Metodología
+"""
+function corregir_tiempo_transporte!(P, δ)
+    hogar = 1:1
+    transporte = 9:12
+    lugares_fuera_del_hogar = [collect(2:8); 13]
+    tiempo_transporte_antiguo = sum(P[:,transporte], dims = 2)
+    tiempo_fuera_hogar_nuevo = sum(P[:,lugares_fuera_del_hogar], dims = 2)
+    tiempo_transporte_nuevo = δ.*tiempo_fuera_hogar_nuevo
+    P[:, transporte] = P[:, transporte] .* tiempo_transporte_nuevo ./tiempo_transporte_antiguo
+    P[:, hogar] += tiempo_transporte_antiguo - tiempo_transporte_nuevo
+    P
+end
+
+"""
+    reducir_tiempo_trabajo!(P)
+Modifica una matriz de tiempos de residencia, disminuyendo el tiempo en el
+trabajo ha en un 20% para la clase baja, un 50% para la clase media y un 80%
+para la clase alta (y agregándolo al hogar).
+# Argumentos
+- `P`: array de dim 2
+    Matriz de tiempos de residencia.
+"""
+function reducir_tiempo_trabajo!(P)
+    hogar = 1
+    trabajo = 2
+    tpo_trabajo = P[:,trabajo]
+    clase_baja, clase_media, clase_alta = index_clases()
     frac_reduccion = ones(18)
     frac_reduccion[clase_baja] .= 0.2
     frac_reduccion[clase_media] .= 0.5
     frac_reduccion[clase_alta] .= 0.8
-
-    P2 = copy(P)
-    P2[:,2] -= tpo_trabajo.*frac_reduccion
-    P2[:,1] += tpo_trabajo.*frac_reduccion
-    P2[:,1] += 0.95*P2[:,3]
-    P2[:,3] *= 0.05
-    transporte = 9:12
-    P2[:,1] += sum(P2[:, transporte], dims = 2)/2.
-    P2[:, transporte] /= 2.0
-
-    return P2
+    P[:,hogar] += tpo_trabajo.*frac_reduccion
+    P[:,trabajo] -= tpo_trabajo.*frac_reduccion
 end
 
+
+
+"""
+    reducir_tiempo_estudios!(P)
+Modifica una matriz de tiempos de residencia, disminuyendo el tiempo en el ambiente
+estudios en un 95% (y agregándolo al hogar).
+# Argumentos
+- `P`: array de dim 2
+Matriz de tiempos de residencia.
+"""
+function reducir_tiempo_estudios!(P)
+    hogar = 1
+    estudios = 3
+    P[:,hogar] += 0.95*P[:,estudios]
+    P[:,estudios] *= 0.05
+end
+
+"""
+    reducir_tiempo_transporte!(P)
+Modifica una matriz de tiempos de residencia, disminuyendo el tiempo en todos
+los ambientes asociados a transporte a la mitad (y agregándolo al hogar).
+# Argumentos
+- `P`: array de dim 2
+Matriz de tiempos de residencia.
+"""
+function reducir_tiempo_transporte!(P)
+    transporte = 9:12
+    P[:,1] += sum(P[:, transporte], dims = 2)/2.
+    P[:, transporte] /= 2.0
+end
 
 """
     index_clases()
@@ -131,6 +221,10 @@ end
 - `clase_baja::Array`
 - `clase_media::Array`
 - `clase_alta::Array`
+# Ejemplo
+```julia
+clase_baja, clase_media, clase_alta = index_clases()
+```
 """
 function index_clases()
     clase_baja = [1,2,7,8,13,14]
@@ -181,11 +275,14 @@ Modelo epidemiológico tipo SEIIR
   - `φ`: fraccion de asintomaticos
   - `γ`: tasa de recuperacion asintomaticos
   - `γₘ`: tasa de recuperacion sintomaticos
+  - `η`: tasa de muerte
 - `t`:
 """
 function seiir!(du,u::ComponentArray,p,t)
-    α, β, ν, φ, γ, γₘ, P = p
-    λ = P*((P'*(u.I + α*u.E + u.Im)).*β./(P'*(u.S + u.E + u.Im + u.I + u.R)))
+    α₁,α₂, β, ν, φ, γ, γₘ, P = p
+    PᵗᵢI = zeros(size(P_normal)[2])
+    PᵗᵢI[1] = sum(u.I)
+    λ = P*(( PᵗᵢI + P'*(α₁*u.E + α₂*u.Im)).*β./(P'*(u.S + u.E + u.Im + u.I + u.R)))
     du.S  = -λ.*u.S
     du.E  = λ.*u.S - ν.*u.E
     du.I  = φ*ν.*u.E - γ.*u.I
@@ -194,6 +291,19 @@ function seiir!(du,u::ComponentArray,p,t)
 end;
 
 
+function seiir_Pt!(du,u::ComponentArray,p,t)
+    α₁,α₂, β, ν, φ, γ, γₘ, τ, P1, P2 = p
+
+    PᵗᵢI = zeros(size(P1)[2])
+    PᵗᵢI[1] = sum(u.I)
+    P = ((P2-P1)/π)*atan(15*(t-τ)) + (P1+P2)/2
+    λ = P*(( PᵗᵢI + P'*(α₁*u.E + α₂*u.Im)).*β./(P'*(u.S + u.E + u.Im + u.I + u.R)))
+    du.S  = -λ.*u.S
+    du.E  = λ.*u.S - ν.*u.E
+    du.I  = φ*ν.*u.E - γ.*u.I
+    du.Im = (1.0 - φ).*ν.*u.E - γₘ .*u.Im
+    du.R  = γₘ .*u.Im + γ.*u.I
+end
 """
     set_up_inicial_conditions(total_por_clase)
 Crea un vector por componentes con las condiciones iniciales.
@@ -202,9 +312,9 @@ Crea un vector por componentes con las condiciones iniciales.
 """
 function set_up_inicial_conditions(total_por_clase)
     n_clases = length(total_por_clase)
-    e0 = 5.0*ones(n_clases)
-    i0 = zeros(n_clases)
-    im0 = zeros(n_clases)
+    e0 = 7.0*ones(n_clases)
+    i0 = 10*ones(n_clases)
+    im0 = 100*ones(n_clases)
     s0 = total_por_clase - e0
     r0 = zeros(n_clases)
 
@@ -225,13 +335,23 @@ gm = 0.55
 phi = 0.4 en [0,1]
 nu = 0.14
 """
-function set_up_parameters(a, beta, nu, phi, gi, gm, P)
+function set_up_parameters(a₁,a₂, beta, nu, phi, gi, gm, P)
     β = beta*[0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
     ν = nu*ones(n_clases)
     φ = phi
     γ = gi*ones(n_clases)
     γₘ = gm*ones(n_clases)
-    p = (a, β, ν, φ, γ, γₘ, P)
+    p = (a₁,a₂, β, ν, φ, γ, γₘ, P)
+    return p
+end
+
+function set_up_parameters2(a₁,a₂, beta, nu, phi, gi, gm, τ, P, P2)
+    β = beta*[0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
+    ν = nu*ones(n_clases)
+    φ = phi
+    γ = gi*ones(n_clases)
+    γₘ = gm*ones(n_clases)
+    p = (a₁,a₂, β, ν, φ, γ, γₘ, τ, P,P2)
     return p
 end
 
@@ -242,8 +362,8 @@ los parametros usados. La notación es:
 `_` + nombre del parámetro + valor del parámetro
 Para evitar problemas, se usa `-` como separador decimal.
 """
-function make_filename(a, beta, nu, phi, gi, gm)
-    filename = "_a$a _beta$beta _nu$nu _phiei$phi _gi$gi _gm$gm"
+function make_filename(a₁,a₂, beta, nu, phi, gi, gm)
+    filename = "_a1$a₁ _a2$a₂ _beta$beta _nu$nu _phiei$phi _gi$gi _gm$gm"
     filename = replace(filename, " " => "")
     filename = replace(filename, "." => "-")
     println(filename)
