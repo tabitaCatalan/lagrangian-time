@@ -20,7 +20,7 @@ R'(t) &=& \phi \nu I(t) - \eta R(t) \\
 U'(t) &=& (1-\phi) \nu I(t) - \eta U(t)
 \end{array}
 \right.
-$$
+$$ 
 
 Este modelo ha sido estudiado teóricamente y aplicado al caso de Chile[^2]. Nos interesa utilizarlo con un enfoque lagrangiano, considerando el tiempo invertido por diferentes grupos sociales (separados por edad, sexo, etc) en varios ambientes (escuela, hogar, trabajo, etc), como plantea [^3].
 
@@ -28,23 +28,98 @@ Más específicamente, separamos a la población en $n$ clases, las cuales inter
 
 $$
 \begin{array}{rcl}
-S_i'(t) &=& -S_i(t)\lambda(t) \\
-E_i'(t) &=& S_i(t)\lambda - \nu_i E_i(t) \\
-I_i'(t) &=& \phi\nu_i E_i(t) - \gamma_i I_i(t) \\
-(I_i^{m})'(t) &=& (1-\phi)\nu_i E_i(t) - \gamma^m_{i} I_i^m(t) \\
-R_i'(t) &=& \gamma_i I_i(t) + \gamma^m_{i} I_i^m(t)
+S_i'(t) &=& -S_i(t)\lambda_i(t) \\
+E_i'(t) &=& S_i(t)\lambda_i(t) - \gamma_{E} E_i(t) \\
+I_i'(t) &=& \phi\gamma_{E} E_i(t) - \gamma_{I} I_i(t) \\
+(I_i^{m})'(t) &=& (1-\phi)\gamma_{I} E_i(t) - \gamma_{I^m} I_i^m(t) \\
+R_i'(t) &=& \gamma_I I_i(t) + \gamma_{I^m} I_i^m(t)
 \end{array}
 $$
 donde la tasa de contagio $\lambda_i$ se define como sigue.
 $$
-\lambda_i(t) = \sum_{j=1}^m \beta_{ij}p^S_{ij}
+\lambda_i(t) = \sum_{j=1}^m \beta_{j}p^S_{ij}
 \left(
-\alpha \frac{\sum_{k=1}^{n} p^E_{kj}E_k}{\sum_{k=1}^{n}p^E_{kj}N_k}
+\alpha_E \frac{\sum_{k=1}^{n} p^E_{kj}E_k}{\sum_{k=1}^{n}p^E_{kj}N_k}
 +
-\beta \frac{\sum_{k=1}^{n} p^I_{ kj}I_k }{\sum_{k=1}^{n}p^I_{kj}N_k} +
-\gamma \frac{\sum_{k=1}^{n}p^{I^m}_{kj}I^m_k}{\sum_{k=1}^{n}p^{I^m}_{kj}N_k}
+\alpha_{I} \frac{\sum_{k=1}^{n} p^I_{ kj}I_k }{\sum_{k=1}^{n}p^I_{kj}N_k} +
+\alpha_{I^m} \frac{\sum_{k=1}^{n}p^{I^m}_{kj}I^m_k}{\sum_{k=1}^{n}p^{I^m}_{kj}N_k}
 \right)
 $$
+
+
+
+Hno Nelson
+Pastor Juan Bautista
+Hno Carlos
+
+
+
+## Matriz de residencia de Infectados
+Después de leer un poco más el artículo donde aparece el modelo con tiempos de residencia, veo que tiene razón con separar las fracciones, no estaría bien dejarlas con un denominador común. Con respecto al problema del denominador que se anula, tengo esto:
+
+Supongamos que los infectados detectados $I$ pasan todo el tiempo en su casa, o en un ambiente donde haya bajo riesgo de contagio (Incluso es posible suponer que no contagian, como en el modelo que estudió Andrés Navas). Entonces su matriz de residencia $P^I$ es de la forma 
+ $$
+ (p^I)_{ij} = \delta_{\text{hogar},j}
+ $$
+Cuando calculamos los riesgos de contagio en un ambiente $j$, necesitamos la fracción de infectados que está en ese ambiente. Pero ya vimos que los infectados detectados solo pasan tiempo en el ambiente hogar, así que fuera del ambiente hogar no hay probabilidad de ser contagiado por un infectado detectado. En el ambiente hogar, sin embargo, están los infectados detectados de todas las clases, así que ahí la fracción sería 
+$$
+\frac{
+\sum_{i=1}^{\text{total clases}} I_i
+}{
+\sum_{i=1}^{\text{total clases}} N_i
+}
+$$
+
+Finalmente, eso deja la tasa de contagios como sigue:
+$$
+\lambda_i(t) = \sum_{j=1}^m \beta_{j}p^S_{ij}
+\left(
+\alpha_E \frac{\sum_{k=1}^{n} p^E_{kj}E_k}{\sum_{k=1}^{n}p^E_{kj}N_k}
++
+\alpha_{I^m} \frac{\sum_{k=1}^{n}p^{I^m}_{kj}I^m_k}{\sum_{k=1}^{n}p^{I^m}_{kj}N_k}
++
+\alpha_{I} \delta_{\text{hogar},j} \frac{\sum_{i=1}^{\text{total clases}} I_i}{\sum_{i=1}^{\text{total clases}} N_i}
+\right)
+$$
+
+Si lo traducimos a notación matricial (la división aquí corresponde a división por coordenada, y la multiplicación con un $\cdot$ también. Si no hay símbolo es multiplicación de matrices. $\vec{\delta}_i$ es un vector de largo $m$ con 0's en todas sus coordenadas salvo en $i$).
+
+$$
+P
+\left[
+\beta \cdot
+\left(
+\alpha_E \frac{(P^E)^t E}{(P^E)^t N} + \alpha_{I^m} \frac{(P^{I^m})^t I^m}{(P^{I^m})^t N} +  \alpha_I \vec{\delta}_{\text{hogar}} \frac{\sum_{i=1}^{n} I_i}{\sum_{i=1}^{n} N_i}
+\right)
+\right]
+$$
+
+Si queremos evitar construir un vector de muchos 0's, una forma alternativa es la siguiente
+
+en todas sus coordenadas salvo en $i$).
+
+$$
+P
+\left[
+\beta \cdot
+\left(
+\alpha_E \frac{(P^E)^t E}{(P^E)^t N} + \alpha_{I^m} \frac{(P^{I^m})^t I^m}{(P^{I^m})^t N} 
+\right)
+\right]+
+\beta_1  \alpha_I \frac{\sum_{i=1}^{n} I_i}{\sum_{i=1}^{n} N_i}
+P_{:, \text{hogar}} 
+$$
+
+Usamos esta forma alternativa 
+```julia
+function calcular_lambda!(λ, αₑ, αᵢₘ, β, P, S, E, I, Iᵐ)
+    hogar = 1
+    N = S + E + I + Iᵐ + R
+    λ =  P*(β .* ( αₑ*(P' * E)./(P' * N) + αᵢₘ*(P' * Iᵐ)./(P' * N) ))
+    λ += β[1]*(sum(I)/sum(N))*P[:,hogar]
+end
+```
+
 ## Tasa de contagio
 En el Reporte 5 [^4] usan matrices de contacto en lugar de tiempos de residencia, pero la idea es interesante. Consideran una matriz de contacto a la que contribuyen varios factores ($\text{w}$ corresponde a trabajo (*work*), $\text{s}$ es escuela (*school*), $\text{h}$ es hogar (*home*) y $\text{o}$ es otros (*other*)).
 $$

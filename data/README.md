@@ -22,9 +22,14 @@ La población de cada comuna se obtiene a partir de los datos del CENSO 2017. Lo
 - `hombres`: cantidad de hombres de esa comuna que están en ese rango de edad.
 - `mujeres`: cantidad de mujeres de esa comuna que están en ese rango de edad.
 
+
+## Movilidad en Santiago
+Fueron obtenidos del visualizar de movilidad del ISCI. 
+
 # Fuentes
 
 - REGIÓN METROPOLITANA DE SANTIAGO - ÍNDICE DE PRIORIDAD SOCIAL DE COMUNAS 2019. Seremi de Desarrollo Social y Familia Metropolitana.  
 Obtenido de [www.desarrollosocialyfamilia.gob.cl](http://www.desarrollosocialyfamilia.gob.cl/storage/docs/INDICE._DE_PRIORIDAD_SOCIAL_2019.pdf) el 24 de septiembre de 2020.
 - Códigos Únicos Territoriales. Obtenido de [datosabiertos.ine.cl](https://datosabiertos.ine.cl/dataviews/250601/codigos-unicos-territoriales/) el 24 de septiembre de 2020.
 - Datos oficiales Censo 2017. Obtenido de [www.censo2017.cl](http://www.censo2017.cl/descargue-aqui-resultados-de-comunas/) el 24 de septiembre de 2020.
+- Variación porcentual de la movilidad en el tiempo en el Gran Santiago, a escala de Zona Censal, y zonas bajo cuarentena. Obtenido de [ISCI Covid Analytics](https://covidanalytics.isci.cl/movilidad/visualizador/) el 24 de septiemnre de 2020.

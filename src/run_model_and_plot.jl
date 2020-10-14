@@ -65,14 +65,20 @@ total_por_clase_censo = [
     128125
 ]
 
-total_por_clase = total_por_clase_censo
+total_por_clase = total_por_clase_censo/10
 
 u0 = set_up_inicial_conditions(total_por_clase)
 
 #αᵢₘ = 0.15; αₑ = aᵢₘ/2
-αᵢₘ = 0.7; αₑ = αᵢₘ/2; β = 1.2; γₑ = 0.14; φ = 0.4;
-γᵢ = 0.3; γᵢₘ = 0.3;
+αᵢₘ = 0.4; αₑ = αᵢₘ/2; β = 1.5; γₑ = 0.14; φ = 0.1; β₂ = 3.
+dias = 6
+γᵢ = 1/dias; γᵢₘ = 1/dias;
+
+
+
+tspan = (0.0,500.0)
 τ = 400. # tiempo de implementar medidas
+
 
 s,e,im,i,r = index_estados(n_clases)
 
@@ -81,44 +87,72 @@ p2 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ,P_cuarent
 p3 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_normal)
 p4 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_trabajo_normal)
 p5 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_con_clases)
+p6 = set_up_parameters3(αₑ, αᵢₘ, β, β₂, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena)
 
-tspan = (0.0,600.0)
-
-output_folder = "../img/SEIIR-P_ips/"
+output_folder = "../img/presentacion-investigadores/"
 filename = make_filename(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ)
+extension = ".svg"
+
 
 ### Resolver
-prob1 = ODEProblem(seiir!,u0,tspan,p1)
-sol1 = solve(prob1, saveat = 1.)
-prob_cuarentena = remake(prob1; p = p2)
-sol_cuarentena = solve(prob_cuarentena, saveat = 1.)
+save_at = 2.
+
+prob_normal = ODEProblem(seiir!,u0,tspan,p1)
+sol_normal = solve(prob_normal, saveat = save_at)
+
+prob_cuarentena = remake(prob_normal; p = p2)
+sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
+
+
+
+plot_all_states(sol_normal, n_clases, nombre_clases; indexs = joven)
+
+
+plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
+
+
 
 prob_retormar_normalidad = ODEProblem(seiir_Pt!, u0, tspan, p3)
-sol_retormar_normalidad = solve(prob_retormar_normalidad, saveat = 5.)
+sol_retormar_normalidad = solve(prob_retormar_normalidad, saveat = save_at)
 prob_retomar_trabajo = remake(prob_retormar_normalidad; p = p4)
-sol_retormar_trabajo = solve(prob_retomar_trabajo, saveat = 5.)
+sol_retormar_trabajo = solve(prob_retomar_trabajo, saveat = save_at)
 prob_retomar_clases = remake(prob_retomar_trabajo; p = p5)
-sol_retormar_clases = solve(prob_retomar_clases, saveat = 5.)
+sol_retormar_clases = solve(prob_retomar_clases, saveat = save_at)
+
+prob_eliminar_mascarillas = ODEProblem(seiir_beta_t!, u0, tspan, p6)
+sol_eliminar_mascarillas = solve(prob_eliminar_mascarillas, saveat = save_at)
 
 
+
+plot(title = "Desfase Expuestos")
+plot!(sol_cuarentena, vars = (0,[e[1], i[1]]))
 
 ## Graficar
 ##########################
 ### Total nuevos contagios
 ##########################
 
-plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
 plot_all_states(sol_retormar_normalidad, n_clases, nombre_clases; indexs = clase_baja)
 plot_all_states(sol_retormar_clases, n_clases, nombre_clases; indexs = clase_baja)
-
+plot_all_states(sol_eliminar_mascarillas, n_clases, nombre_clases; indexs = joven)
 
 
 plot_nuevos_contagios(
-    (sol_cuarentena, sol_retormar_normalidad, sol_retormar_clases, sol_retormar_trabajo),
+    (sol_cuarentena, sol_retormar_clases, sol_retormar_trabajo, sol_eliminar_mascarillas),
     n_clases,
-    labels = ["Cuarentena siempre" "Vuelta a normalidad en t=$τ" "Retomar clases en t=$τ" "Vuelta al trabajo en t=$τ"];
+    labels = ["Cuarentena siempre" "Retomar clases en t=$τ" "Vuelta al trabajo en t=$τ" "Eliminar mascarillas en t=$τ"];
     title = "Contagios diarios")
-savefig(output_folder*"comparar_nuevos_contagios2345"*filename)
+savefig(output_folder*"comparar_nuevos_contagios2456"*filename*extension)
+
+
+plot_nuevos_contagios(
+    (sol_normal, sol_cuarentena),
+    n_clases,
+    labels = ["Sin medidas preventivas" "Teletrabajo y cierre de centros educativos "];
+    title = "Contagios diarios")
+plot!(legend=:topright)
+savefig(output_folder*"comparar_nuevos_contagios12"*filename*extension)
+
 
 
 plot_compare_function_of_sols_grouping(
@@ -130,16 +164,18 @@ plot_compare_function_of_sols_grouping(
     total_por_clase = total_por_clase,
     estado = i
 )
+savefig(output_folder*"retorno_trabajo_nvlsocio"*filename*extension)
 
 plot_compare_function_of_sols_grouping(
-    (sol_cuarentena, sol_retormar_clases),
-    (clase_baja, clase_media, clase_alta),
+    (sol_cuarentena, sol_retormar_trabajo),
+    (hombre, mujer),
     incidencia_por_clase;
-    title = "Cambio en la incidencia por nvl socioeconómico\n al restablecer clases en t=$τ",
-    labels_grupos = ["Nvl. bajo" "Nvl. medio" "Nvl. alto"],
+    title = "Cambio en la incidencia por sexo\n al restablecer trabajo en t=$τ",
+    labels_grupos = ["Hombre" "Mujer"],
     total_por_clase = total_por_clase,
     estado = i
 )
+savefig(output_folder*"retorno_trabajo_sexo"*filename*extension)
 
 
 plot_compare_function_of_sols_grouping(
@@ -151,16 +187,86 @@ plot_compare_function_of_sols_grouping(
     estado = i,
     total_por_clase = total_por_clase
 )
+savefig(output_folder*"retorno_clases"*filename*extension)
+
 
 plot_compare_function_of_sols_grouping(
-    (sol_cuarentena, sol_retormar_trabajo),
+    (sol_cuarentena, sol_eliminar_mascarillas),
     (joven, adulto, mayor),
     incidencia_por_clase;
-    title = "Cambio en la incidencia por edad\n al retomar trabajo en t=$τ",
+    title = "Cambio en la incidencia al dejar de usar\n mascarillas en el tranporte público en t=$τ",
     labels_grupos = ["Joven" "Adulto" "Mayor"],
     estado = i,
     total_por_clase = total_por_clase
 )
+savefig(output_folder*"mascarillas-tp-edad"*filename*extension)
+
+plot_compare_function_of_sols_grouping(
+    (sol_cuarentena, sol_eliminar_mascarillas),
+    (clase_baja, clase_media, clase_alta),
+    incidencia_por_clase;
+    title = "Cambio en la incidencia al dejar de usar\n mascarillas al comprar desde t=$τ",
+    labels_grupos = ["Nvl. bajo" "Nvl. medio" "Nvl. alto"],
+    estado = i,
+    total_por_clase = total_por_clase
+)
+savefig(output_folder*"mascarillas-compras-nvl"*filename*extension)
+
+plot_compare_function_of_sols_grouping(
+    (sol_cuarentena, sol_eliminar_mascarillas),
+    (hombre, mujer),
+    incidencia_por_clase;
+    title = "Cambio en la incidencia al dejar de usar\n mascarillas al comprar desde t=$τ",
+    labels_grupos = ["Hombre" "Mujer"],
+    estado = i,
+    total_por_clase = total_por_clase
+)
+savefig(output_folder*"mascarillas-compras-sexo"*filename*extension)
+
+plot_compare_function_of_sols_grouping(
+    (sol_cuarentena, sol_eliminar_mascarillas),
+    (joven, adulto, mayor),
+    incidencia_por_clase;
+    title = "Cambio en la incidencia al dejar de usar\n mascarillas al comprar desde t=$τ",
+    labels_grupos = ["Joven" "Adulto" "Mayor"],
+    estado = i,
+    total_por_clase = total_por_clase
+)
+savefig(output_folder*"mascarillas-compras-edad"*filename*extension)
+
+plot_compare_function_of_sols_grouping(
+    (sol_cuarentena, sol_eliminar_mascarillas),
+    (clase_baja, clase_media, clase_alta),
+    incidencia_por_clase;
+    title = "Cambio en la incidencia al dejar de usar\n mascarillas en el transporte público desde t=$τ",
+    labels_grupos = ["Nvl. bajo" "Nvl. medio" "Nvl. alto"],
+    estado = i,
+    total_por_clase = total_por_clase
+)
+savefig(output_folder*"mascarillas-tp-nvl"*filename*extension)
+
+plot_compare_function_of_sols_grouping(
+    (sol_cuarentena, sol_eliminar_mascarillas),
+    (hombre, mujer),
+    incidencia_por_clase;
+    title = "Cambio en la incidencia al dejar de usar\n mascarillas en el transporte público desde t=$τ",
+    labels_grupos = ["Hombre" "Mujer"],
+    estado = i,
+    total_por_clase = total_por_clase
+)
+savefig(output_folder*"mascarillas-tp-sexo"*filename*extension)
+
+plot_compare_function_of_sols_grouping(
+    (sol_cuarentena, sol_eliminar_mascarillas),
+    (joven, adulto, mayor),
+    incidencia_por_clase;
+    title = "Cambio en la incidencia al dejar de usar\n mascarillas en el transporte público t=$τ",
+    labels_grupos = ["Joven" "Adulto" "Mayor"],
+    estado = i,
+    total_por_clase = total_por_clase
+)
+savefig(output_folder*"mascarillas-tp-edad"*filename*extension)
+
 
 
 
@@ -171,38 +277,41 @@ plot_compare_function_of_sols_grouping(
 # cantidad de personas en el grupo. Se guardan los gráficos (en .png).
 
 plot_compare_function_of_sols_grouping(
-    (sol1, sol3),
+    (sol_normal, sol_cuarentena),
     (clase_baja, clase_media, clase_alta),
     incidencia_por_clase;
-    title = "Cambio en la incidencia por nvl socioeconómico\n al restablecer movilidad en t=200",
+    title = "Cambio en la incidencia por nvl socioeconómico\n ",
     labels_grupos = ["Nvl. bajo" "Nvl. medio" "Nvl. alto"],
     total_por_clase = total_por_clase,
     estado = i
 )
-savefig(output_folder*"incidenc_x_nvlsocio13"*filename)
+savefig(output_folder*"incidenc_x_nvlsocio12"*filename*extension)
 
 plot_compare_function_of_sols_grouping(
-    (sol1, sol3),
+    (sol_normal, sol_cuarentena),
     (hombre, mujer),
     incidencia_por_clase;
-    title = "Cambio en la incidencia por sexo\n al restablecer movilidad en t=200",
+    title = "Cambio en la incidencia por sexo\n ",
     labels_grupos = ["Hombre" "Mujer"],
     estado = i,
     total_por_clase = total_por_clase
 )
-savefig(output_folder*"incidenc_x_sexo13"*filename)
+savefig(output_folder*"incidenc_x_sexo12"*filename*extension)
 
 
 plot_compare_function_of_sols_grouping(
-    (sol1, sol2, sol3),
+    (sol_normal, sol_cuarentena),
     (joven, adulto, mayor),
     incidencia_por_clase;
-    title = "Cambio en la incidencia por edad\n al restablecer movilidad en t=200",
+    title = "Cambio en la incidencia por edad\n ",
     labels_grupos = ["Joven" "Adulto" "Mayor"],
     estado = i,
     total_por_clase = total_por_clase
 )
-savefig(output_folder*"incidenc_x_edad123"*filename)
+savefig(output_folder*"incidenc_x_edad12"*filename*extension)
+
+
+
 
 ##########################
 ### Infectados por grupos

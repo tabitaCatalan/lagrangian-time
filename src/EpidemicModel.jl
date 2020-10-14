@@ -279,25 +279,48 @@ Modelo epidemiológico tipo SEIIR
 - `t`:
 """
 function seiir!(du,u::ComponentArray,p,t)
-    α₁,α₂, β, ν, φ, γ, γₘ, P = p
-    PᵗᵢI = zeros(size(P_normal)[2])
-    PᵗᵢI[1] = sum(u.I)
-    λ = P*(( PᵗᵢI + P'*(α₁*u.E + α₂*u.Im)).*β./(P'*(u.S + u.E + u.Im + u.I + u.R)))
-    du.S  = -λ.*u.S
-    du.E  = λ.*u.S - ν.*u.E
-    du.I  = φ*ν.*u.E - γ.*u.I
-    du.Im = (1.0 - φ).*ν.*u.E - γₘ .*u.Im
-    du.R  = γₘ .*u.Im + γ.*u.I
+    αₑ, αᵢₘ, β, ν, φ, γ, γₘ, P = p
+    λ = Array{Float64, 1}(undef, size(P_normal)[1])
+    calcular_lambda!(λ, αₑ, αᵢₘ, β, P, u.S, u.E, u.I, u.Im, u.R)
+    du.S  = -λ .* u.S
+    du.E  = λ .* u.S - ν * u.E
+    du.I  = φ * ν * u.E - γ * u.I
+    du.Im = (1.0 - φ) * ν * u.E - γₘ * u.Im
+    du.R  = γₘ * u.Im + γ * u.I
 end;
 
+function calcular_lambda!(λ, αₑ, αᵢₘ, β, P, S, E, I, Iᵐ, R)
+    hogar = 1
+    N = S + E + I + Iᵐ + R
+    λ .= P*(β .* ( αₑ*(P' * E)./(P' * N) + αᵢₘ*(P' * Iᵐ)./(P' * N) ))
+    λ .+= (β[1]*(sum(I)/sum(N))) .* P[:,hogar]
+end
 
+"""
+Permite pasar de una matriz P1 a una matriz P2 en tiempo τ de forma suave.
+"""
 function seiir_Pt!(du,u::ComponentArray,p,t)
     α₁,α₂, β, ν, φ, γ, γₘ, τ, P1, P2 = p
 
     PᵗᵢI = zeros(size(P1)[2])
     PᵗᵢI[1] = sum(u.I)
-    P = ((P2-P1)/π)*atan(15*(t-τ)) + (P1+P2)/2
-    λ = P*(( PᵗᵢI + P'*(α₁*u.E + α₂*u.Im)).*β./(P'*(u.S + u.E + u.Im + u.I + u.R)))
+    P = ((P2-P1)/π)*atan((t-τ)) + (P1+P2)/2
+    λ = Array{Float64, 1}(undef, size(P_normal)[1])
+    calcular_lambda!(λ, α₁, α₂, β, P, u.S, u.E, u.I, u.Im, u.R)
+    du.S  = -λ.*u.S
+    du.E  = λ.*u.S - ν.*u.E
+    du.I  = φ*ν.*u.E - γ.*u.I
+    du.Im = (1.0 - φ).*ν.*u.E - γₘ .*u.Im
+    du.R  = γₘ .*u.Im + γ.*u.I
+end
+
+function seiir_beta_t!(du,u::ComponentArray,p,t)
+    α₁,α₂, β₁, β₂, ν, φ, γ, γₘ, τ, P = p
+    PᵗᵢI = zeros(size(P)[2])
+    PᵗᵢI[1] = sum(u.I)
+    β = ((β₂-β₁)/π)*atan((t-τ)) + (β₁+β₂)/2
+    λ = Array{Float64, 1}(undef, size(P_normal)[1])
+    calcular_lambda!(λ, α₁, α₂, β, P, u.S, u.E, u.I, u.Im, u.R)
     du.S  = -λ.*u.S
     du.E  = λ.*u.S - ν.*u.E
     du.I  = φ*ν.*u.E - γ.*u.I
@@ -312,9 +335,9 @@ Crea un vector por componentes con las condiciones iniciales.
 """
 function set_up_inicial_conditions(total_por_clase)
     n_clases = length(total_por_clase)
-    e0 = 7.0*ones(n_clases)
-    i0 = 10*ones(n_clases)
-    im0 = 100*ones(n_clases)
+    e0 = 10.0*ones(n_clases)
+    i0 = zeros(n_clases) #10*ones(n_clases)
+    im0 = zeros(n_clases) #100*ones(n_clases)
     s0 = total_por_clase - e0
     r0 = zeros(n_clases)
 
@@ -336,17 +359,18 @@ phi = 0.4 en [0,1]
 nu = 0.14
 """
 function set_up_parameters(a₁,a₂, beta, nu, phi, gi, gm, P)
-    β = beta*[0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
-    ν = nu*ones(n_clases)
-    φ = phi
-    γ = gi*ones(n_clases)
-    γₘ = gm*ones(n_clases)
-    p = (a₁,a₂, β, ν, φ, γ, γₘ, P)
+    β = beta*get_riesgos()
+    #ν = nu*ones(n_clases)
+    #φ = phi
+    #γ = gi*ones(n_clases)
+    #γₘ = gm*ones(n_clases)
+    p = (a₁,a₂, β, nu, phi, gi, gm, P)
+    #p = (a₁,a₂, β, ν, φ, γ, γₘ, P)
     return p
 end
 
 function set_up_parameters2(a₁,a₂, beta, nu, phi, gi, gm, τ, P, P2)
-    β = beta*[0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
+    β = beta*get_riesgos()
     ν = nu*ones(n_clases)
     φ = phi
     γ = gi*ones(n_clases)
@@ -354,6 +378,28 @@ function set_up_parameters2(a₁,a₂, beta, nu, phi, gi, gm, τ, P, P2)
     p = (a₁,a₂, β, ν, φ, γ, γₘ, τ, P,P2)
     return p
 end
+
+
+function set_up_parameters3(α₁,α₂, beta₁, beta₂, nu, phi, gi, gm, τ, P)
+    riesgos = get_riesgos()
+    β₁ = beta₁*riesgos
+    β₂ = beta₁*riesgos
+    transporte = 9
+    compras = 4
+    β₂[transporte]  = beta₂
+    #β₂[1] = β₁[1] # la idea es disminuir el uso de mascarillas... fuera del hogar
+    ν = nu*ones(n_clases)
+    φ = phi
+    γ = gi*ones(n_clases)
+    γₘ = gm*ones(n_clases)
+    p = (α₁,α₂, β₁, β₂, ν, φ, γ, γₘ, τ, P)
+    return p
+end
+
+function get_riesgos()
+    return [0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
+end
+
 
 """
     make_filename(a, beta, nu, phi, gi, gm)
