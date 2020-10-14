@@ -182,3 +182,7 @@ medrxiv.org/content/10.1101/2020.03.04.20031104v1?versioned=true.
 
 [^3]: Derdei Bichara, Yun Kang, Carlos Castillo-Chavez, Richard Horan, Charles Perrings. SIS and SIR Epidemic Models Under Virtual Dispersal.
 [^4]: Reporte 5 - Scenarios for the opening schools during the chilean covid-19 outbreak.
+
+
+# Referencias, aportes...
+Mostrar ecuaciones de $\LaTeX$ en el README.md de GitHub no está permitido, por lo que usé [TeXify](https://github.com/apps/texify), basándome en [esta respuesta en Stack Overflow](https://stackoverflow.com/a/53981118).
