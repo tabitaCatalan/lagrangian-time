@@ -27,7 +27,7 @@ La población de cada comuna se obtiene a partir de los datos del CENSO 2017. Lo
 Fueron obtenidos del visualizar de movilidad del ISCI. 
 
 ## Encuesta Origen-Destino 2012
-Base de datos de la encuesta origen destino. Contiene información de viajes e información socioeconómica de los viajeros. 
+Base de datos de la encuesta origen destino. Contiene información de viajes e información socioeconómica de los viajeros. El archivo se llama `EOD2012-Santiago.accdb`.
 
 
 # Fuentes
