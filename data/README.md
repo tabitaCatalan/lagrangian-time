@@ -26,6 +26,10 @@ La población de cada comuna se obtiene a partir de los datos del CENSO 2017. Lo
 ## Movilidad en Santiago
 Fueron obtenidos del visualizar de movilidad del ISCI. 
 
+## Encuesta Origen-Destino 2012
+Base de datos de la encuesta origen destino. Contiene información de viajes e información socioeconómica de los viajeros. 
+
+
 # Fuentes
 
 - REGIÓN METROPOLITANA DE SANTIAGO - ÍNDICE DE PRIORIDAD SOCIAL DE COMUNAS 2019. Seremi de Desarrollo Social y Familia Metropolitana.  
@@ -33,3 +37,4 @@ Obtenido de [www.desarrollosocialyfamilia.gob.cl](http://www.desarrollosocialyfa
 - Códigos Únicos Territoriales. Obtenido de [datosabiertos.ine.cl](https://datosabiertos.ine.cl/dataviews/250601/codigos-unicos-territoriales/) el 24 de septiembre de 2020.
 - Datos oficiales Censo 2017. Obtenido de [www.censo2017.cl](http://www.censo2017.cl/descargue-aqui-resultados-de-comunas/) el 24 de septiembre de 2020.
 - Variación porcentual de la movilidad en el tiempo en el Gran Santiago, a escala de Zona Censal, y zonas bajo cuarentena. Obtenido de [ISCI Covid Analytics](https://covidanalytics.isci.cl/movilidad/visualizador/) el 24 de septiemnre de 2020.
+- Actualización y recolección de información del sistema de transporte urbano, IX Etapa: Encuesta Origen Destino Santiago 2012. Encuesta origen destino de viajes 2012 (Documento Difusión). Obtenido de [SECTRA](http://www.sectra.gob.cl/biblioteca/detalle1.asp?mfn=3253).

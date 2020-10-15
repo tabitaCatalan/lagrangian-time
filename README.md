@@ -2,6 +2,9 @@
 
 Repositorio de mi trabajo de tesis: un modelo lagrangiano con tiempos de residencia.
 
+# Requerimientos
+- Se usó Matlab 2018a.
+- Para procesar la EOD2012 [sqlite3](https://www.mathworks.com/matlabcentral/fileexchange/68298-sqlite3) debe estar en el PATH de Matlab.
 
 # lagrangian-time
 Repositorio de mi trabajo de tesis: un modelo lagrangiano con tiempos de residencia.
