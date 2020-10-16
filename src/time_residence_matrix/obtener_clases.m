@@ -1,6 +1,6 @@
 function [nclases, numeros_clase, tamano_clases, class_names, ...
     temporada, tipo_dia] = obtener_clases(considerar_nvl_econo, tipo_nvl)
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % OBTENER_CLASES 
     % Input:
     % - considerar_nvl_econo: boolean
     %   si es verdadero, entonces la clasificacion considera el nivel
