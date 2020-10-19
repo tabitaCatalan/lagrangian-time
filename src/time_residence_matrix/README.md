@@ -39,6 +39,7 @@ Tramo | Ingreso mínimo ($) | Ingreso máximo ($)
 Los ingresos de corte fueron elegidos simplemente para que quedara una cantidad similar de personas en cada grupo.
 - **Tramo máximo por hogar:** Se considera el `TramoIngresoFinal` más alto de todas las personas del mismo hogar, y se le asigna a todos los habitantes del hogar.
 - **Tasa de pobreza:** Se usa la tasa de pobreza de la comuna a la que pertenece el hogar (ver descripción de los datos para detalles de cómo se obtiene). Se separa a la población en 3 tramos:
+
 Tramo | Tasa mínima | Tasa máxima
 --- | ---   |---
 1   | 10%   | 100%
@@ -46,6 +47,7 @@ Tramo | Tasa mínima | Tasa máxima
 3   | 0%    | <5%
 
 - **IPS:** Se usa el índice de prioridad social (ver descripción de los datos para más detalles). Se separa a la población en 3 tramos:
+
 Tramo | IPS mínimo | IPS máximo
 --- | ---   |---
 1   | 72    | ∞

@@ -5,6 +5,8 @@ de varias formas.
 */
 SELECT Persona.Persona AS id_persona,
 Hogar.Hogar AS id_hogar,
+Hogar.Temporada AS temporada,
+Hogar.TipoDia AS tipo_dia,
 CASE 
     WHEN EdadPersonas.Edad < 25 THEN 1 
     WHEN EdadPersonas.Edad >= 25 AND EdadPersonas.Edad < 65 THEN 2
@@ -22,8 +24,7 @@ CASE
     ELSE 0
 END AS tramo_ingreso_promedio,
 Persona.TramoIngresoFinal AS tramo_ingreso_final_ppersona,
-Hogar.Temporada AS temporada,
-Hogar.TipoDia AS tipo_dia,
+Maximo.maximo AS tramo_max,
 IPS.ips AS ips,
 CASE
     WHEN IPS.ips >= 72 THEN 1
@@ -41,12 +42,19 @@ FROM Persona, Hogar, EdadPersonas,
     SELECT Hogar.Hogar AS hogar, Hogar.IngresoHogar/Hogar.NumPer AS ingreso_hogar_promedio
     FROM Hogar 
 ) AS Promedio, 
-ComunasSantiago, IPS, TasaPobreza
+ComunasSantiago, IPS, TasaPobreza, 
+(
+    SELECT Hogar.Hogar AS hogar, MAX(Persona.TramoIngresoFinal) AS maximo
+    FROM Hogar, Persona
+    WHERE Hogar.Hogar = Persona.Hogar
+    GROUP BY Hogar.Hogar
+) AS Maximo
 WHERE Persona.Hogar = Hogar.Hogar
 AND Persona.Persona = EdadPersonas.Persona
 AND Promedio.Hogar = Hogar.Hogar
 AND Hogar.Comuna = ComunasSantiago.Comuna 
 AND ComunasSantiago.id_comuna = IPS.id_comuna
 AND ComunasSantiago.id_comuna = TasaPobreza.id_comuna
-LIMIT 5
+AND Maximo.hogar = Hogar.hogar
+ORDER BY Persona.Persona
 ;

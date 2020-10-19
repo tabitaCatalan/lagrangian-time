@@ -6,14 +6,16 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     %   si es verdadero, entonces la clasificacion considera el nivel
     %   socioeconomico.
     % - tipo_nvl: str
-    %   Tipo de nvl socioeconómico usado. Las opciones son:
+    %   Tipo de nvl socioeconomico usado. Las opciones son:
     %   - 'promedio': considera el ingreso per capita por hogar (suma de los
     %      ingresos de todos los integrantes del grupo familiar, dividido
     %      en el total de integrantes)
     %   - 'maximo': considera el maximo tramo final de todos los miembros 
     %      del hogar.
     %   - 'ips': basado en el IPS de la comuna donde reside la persona.
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %   - 'pobreza': basado en la tasa de pobreza de la comuna donde reside
+    %       la persona.
+    %
     % Output:
     % - nclases:
     %   cantidad de clases usadas
@@ -24,19 +26,22 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     % - class_names:
     %   array categorico, de largo nclases, con los nombres de las clases.
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Debe haber un excel Clases.xlsx en el directorio, el cual debe tener
-    % los siguientes atributos:
-    % Col 1: id persona
-    % Col 2: id hogar
-    % Col 3: grupo edad 1,2,3
-    % Col 4: sexo 1,2 (Masculino, Femenino)
-    % Col 5: ingreso hogar
-    % Col 6: tramo ingreso promedio 1,..,6 (0 significa sin clasificar)
-    % Col 7: tramo ingreso final por persona
-    % Col 8: temporada
-    % Col 9: tipo dia
-    % Col10: tramoIPS 
-    % Col11: max tramo ingreso final por hogar
+    % Se lee la base de datos usando una consulta sql, que devuelve una
+    % tabla con los siguientes atributos:
+    % 1: id_persona
+    % 2: id_hogar
+    % 3: temporada
+    % 4: tipo_dia
+    % 5: grupo_edad
+    % 6: sexo 
+    % 7: ingreso_hogar_promedio
+    % 8: tramo_ingreso_promedio
+    % 9: tramo_ingreso_final_ppersona
+    % 10: tramo_max  
+    % 11: ips
+    % 12: tramo_ips
+    % 13: tasa_pobreza
+    % 14: tramo_pobreza
     %
     % Si considerar_nvl_econo = true, entonces para los tipos 'maximo' y 'promedio'
     % se consideran niveles socioeconomicos agrupando tramos como sigue:
@@ -45,14 +50,18 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     % 2     | 3,4
     % 3     | 5,6
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    col_temp = 8;
-    col_dia = 7;
-    
-    Clases=xlsread('Clases.xlsx');
+    %% Leer base de datos
+    % Se lee la base de datos y se guarda como tabla.
+    eod_db = '../../data/EOD2012-Santiago.db';
+    sql_query = fileread('clases-query.sql');
 
-    col_edad  = 3;
-    col_sexo  = 4;
+    Clases = struct2table(sqlite3(eod_db, sql_query));
+    
+    %% Indices de las columnas
+    col_temp = 3;
+    col_dia = 4;
+    col_edad  = 5;
+    col_sexo  = 6;
 
     %% Obtener indices de cada clasificacion
     % Sexo
@@ -71,23 +80,27 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     
     if considerar_nvl_econo
 
-        if strcmp(tipo_nvl, 'ips')
-            col_tramo = 10; 
+        if strcmp(tipo_nvl, 'ips') || strcmp(tipo_nvl, 'pobreza')
+            if strcmp(tipo_nvl, 'ips')
+                col_tramo = 12; 
+            elseif strcmp(tipo_nvl, 'pobreza')
+                col_tramo = 14;
+            end
             tramo1 = (Clases(:,col_tramo)==1);
             tramo2 = (Clases(:,col_tramo)==2);
             tramo3 = (Clases(:,col_tramo)==3);
         elseif strcmp(tipo_nvl, 'promedio') || strcmp(tipo_nvl, 'maximo')
             if strcmp(tipo_nvl, 'promedio')
-                col_tramo = 6;
+                col_tramo = 8;
             elseif strcmp(tipo_nvl, 'maximo')
-                col_tramo = 11;
+                col_tramo = 10;
             end
             % Nivel Socioeconomico 1...6, (1 es el menor nivel socioeconomico)
             tramo1 = (Clases(:,col_tramo)==1|Clases(:,col_tramo)==2);
             tramo2 = (Clases(:,col_tramo)==3|Clases(:,col_tramo)==4);
             tramo3 = (Clases(:,col_tramo)==5|Clases(:,col_tramo)==6);
         else 
-            disp("Por favor ingrese un tipo de nivel socioeconómico válido. Las opciones son 'maximo', 'promedio', 'ips'.")
+            disp("Por favor ingrese un tipo de nivel socioeconomico valido. Las opciones son 'maximo', 'promedio', 'ips', 'pobreza'.")
         end
 
         %% Definir clases
