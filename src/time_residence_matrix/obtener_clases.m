@@ -56,6 +56,7 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     sql_query = fileread('clases-query.sql');
 
     Clases = struct2table(sqlite3(eod_db, sql_query));
+    Clases = Clases{:,:}; % pasar a matriz
     
     %% Indices de las columnas
     col_temp = 3;

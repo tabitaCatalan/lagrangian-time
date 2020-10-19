@@ -6,7 +6,7 @@
    <!--
 This HTML was auto-generated from MATLAB code.
 To make changes, update the MATLAB code and republish this document.
-      --><title>Leer base de datos EOD2012, corregir y guardar en una variable de Matlab.</title><meta name="generator" content="MATLAB 9.4"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2020-10-15"><meta name="DC.source" content="read_EOD.m"><style type="text/css">
+      --><title>Leer base de datos EOD2012, corregir y guardar en una variable de Matlab.</title><meta name="generator" content="MATLAB 9.4"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2020-10-19"><meta name="DC.source" content="read_EOD.m"><style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
 
 html { min-height:100%; margin-bottom:1px; }
@@ -66,21 +66,21 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 
 
 
-  </style></head><body><div class="content"><h1>Leer base de datos EOD2012, corregir y guardar en una variable de Matlab.</h1><!--introduction--><p>Autor: Tabita Catalan</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Requerimientos</a></li><li><a href="#2">Leer base de datos</a></li><li><a href="#3">Correcciones al formato de los datos</a></li><li><a href="#4">Guardar el resultado</a></li></ul></div><h2 id="1">Requerimientos</h2><p><tt>sqlite3</tt> debe estar en el PATH de Matlab. Obtener de <a href="https://www.mathworks.com/matlabcentral/fileexchange/68298-sqlite3">https://www.mathworks.com/matlabcentral/fileexchange/68298-sqlite3</a></p><pre class="codeinput">addpath(<span class="string">'C:\Users\Tabita\Documents\MATLAB\sqlite3'</span>) <span class="comment">% path a sqlite3</span>
+  </style></head><body><div class="content"><h1>Leer base de datos EOD2012, corregir y guardar en una variable de Matlab.</h1><!--introduction--><p>Autor: Tabita Catalan</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Requerimientos</a></li><li><a href="#2">Leer base de datos</a></li><li><a href="#3">Correcciones al formato de los datos</a></li><li><a href="#4">Se extraen los valores</a></li><li><a href="#5">Guardar el resultado</a></li></ul></div><h2 id="1">Requerimientos</h2><p><tt>sqlite3</tt> debe estar en el PATH de Matlab. Obtener de <a href="https://www.mathworks.com/matlabcentral/fileexchange/68298-sqlite3">https://www.mathworks.com/matlabcentral/fileexchange/68298-sqlite3</a></p><pre class="codeinput">addpath(<span class="string">'C:\Users\Tabita\Documents\MATLAB\sqlite3'</span>) <span class="comment">% path a sqlite3</span>
 </pre><h2 id="2">Leer base de datos</h2><p>Se lee la base de datos y e guarda como tabla.</p><pre class="codeinput">eod_db = <span class="string">'../../data/EOD2012-Santiago.db'</span>;
 sql_query = fileread(<span class="string">'viajes-query.sql'</span>);
 
 viajes_data = struct2table(sqlite3(eod_db, sql_query));
 </pre><h2 id="3">Correcciones al formato de los datos</h2><p><b>Cambiar columnas de tipo <i>cell array</i> por array de <i>doubles</i></b></p><pre class="codeinput"><span class="comment">% Las celdas vacias se reemplazan por |NaN|</span>
-columnas_malas = [4,9,11,12,18,19,20,21];
+columnas_malas = [4,9,11,12,15,16,18,19,20,21];
 <span class="keyword">for</span> columna = columnas_malas
     viajes_data{cellfun(@isempty,viajes_data{:,columna}), columna} = {nan};
 <span class="keyword">end</span>
-
-<span class="comment">% Se extraen los valores</span>
-extract_value = @(x) x(1);
+</pre><h2 id="4">Se extraen los valores</h2><pre class="codeinput">extract_value = @(x) x(1);
 viajes_data.ocupacion = cellfun(extract_value, viajes_data{:,4});
 viajes_data.proposito = cellfun(extract_value, viajes_data{:,9});
+viajes_data.comuna_origen = cellfun(extract_value, viajes_data{:,15});
+viajes_data.comuna_destino = cellfun(extract_value, viajes_data{:,16});
 viajes_data.xo = cellfun(extract_value, viajes_data{:,18});
 viajes_data.yo = cellfun(extract_value, viajes_data{:,19});
 viajes_data.xd = cellfun(extract_value, viajes_data{:,20});
@@ -91,7 +91,8 @@ viajes_data.yd = cellfun(extract_value, viajes_data{:,21});
 <span class="comment">% transforma a una fraccion del dia.</span>
 viajes_data.hora_inicio = cellfun(@extract_frac_hour, viajes_data{:,11});
 viajes_data.hora_fin = cellfun(@extract_frac_hour, viajes_data{:,12});
-</pre><h2 id="4">Guardar el resultado</h2><p>La tabla resultante se guarda en el archivo <tt>viajes.mat</tt>, en la carpeta <tt>results</tt>.</p><pre class="codeinput">viajes_data_filename = <span class="string">'..\..\results\viajes'</span>;
+</pre><h2 id="5">Guardar el resultado</h2><p>La tabla resultante se guarda en el archivo <tt>viajes.mat</tt>, en la carpeta <tt>results</tt>.</p><pre class="codeinput">viajes_data_filename = <span class="string">'..\..\results\viajes'</span>;
+viajes_data = viajes_data{:,:};
 save(viajes_data_filename, <span class="string">'viajes_data'</span>)
 </pre><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018a</a><br></p></div><!--
 ##### SOURCE BEGIN #####
@@ -116,15 +117,17 @@ viajes_data = struct2table(sqlite3(eod_db, sql_query));
 % *Cambiar columnas de tipo _cell array_ por array de _doubles_*
 
 % Las celdas vacias se reemplazan por |NaN|
-columnas_malas = [4,9,11,12,18,19,20,21];
+columnas_malas = [4,9,11,12,15,16,18,19,20,21];
 for columna = columnas_malas
     viajes_data{cellfun(@isempty,viajes_data{:,columna}), columna} = {nan};
 end
 
-% Se extraen los valores
+%% Se extraen los valores
 extract_value = @(x) x(1);
 viajes_data.ocupacion = cellfun(extract_value, viajes_data{:,4});
 viajes_data.proposito = cellfun(extract_value, viajes_data{:,9});
+viajes_data.comuna_origen = cellfun(extract_value, viajes_data{:,15});
+viajes_data.comuna_destino = cellfun(extract_value, viajes_data{:,16});
 viajes_data.xo = cellfun(extract_value, viajes_data{:,18});
 viajes_data.yo = cellfun(extract_value, viajes_data{:,19});
 viajes_data.xd = cellfun(extract_value, viajes_data{:,20});
@@ -141,6 +144,7 @@ viajes_data.hora_fin = cellfun(@extract_frac_hour, viajes_data{:,12});
 % La tabla resultante se guarda en el archivo |viajes.mat|, en la carpeta
 % |results|.
 viajes_data_filename = '..\..\results\viajes';
+viajes_data = viajes_data{:,:};
 save(viajes_data_filename, 'viajes_data')
 ##### SOURCE END #####
 --></body></html>

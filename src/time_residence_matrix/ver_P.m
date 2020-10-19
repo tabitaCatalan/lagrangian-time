@@ -1,6 +1,7 @@
 function [] = ver_P(P, considerar_nvl_socioecono,...
     considerar_no_viajeros, restar_horas_sueno, modo_normalizacion, ...
     ambientes, nclases, nombres_clases, tomar_log, tpo_nvl_socio, quitar_cols)
+    % Version de ver_P con colores por ambiente
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Input:
     % - 
@@ -37,13 +38,13 @@ function [] = ver_P(P, considerar_nvl_socioecono,...
         econotipo = tpo_nvl_socio;
     end
     
-    filename = strcat('images_matrix_P/P-', nombre,...
+    filename = strcat('../../img/images_matrix_P/P-', nombre,...
                     'econo', econotipo, num2str(considerar_nvl_socioecono), ...
                     '-no_viaj',num2str(considerar_no_viajeros),...
                     '-restarsueno',num2str(restar_horas_sueno),...
                     '-log',num2str(tomar_log),...
                     '-delcol',num2str(quitar_cols),...
-                    '-norm',num2str(modo_normalizacion),'.png');
+                    '-norm',num2str(modo_normalizacion),'.svg');
     
     figure('Position',[680 180 1041 918]);
     
@@ -53,17 +54,18 @@ function [] = ver_P(P, considerar_nvl_socioecono,...
         bar3(fliplr(log(P(:,quitar_cols+1:end)')/log(2)));
         %imagesc(log(P)/log(2))
     else
-        bar3(fliplr(P(:,quitar_cols+1:end)'));
+        bar3(rot90(P(:,quitar_cols+1:end),2));
         %imagesc(P)
     end
     
     
-    view(-60,50)
+    view(-140,45)
+    colormap(distinguishable_colors(14))
     ax=gca;
-    ax.YTick=1:13-quitar_cols;
-    ax.XTick=1:nclases;
-    ax.YTickLabels=ambientes(quitar_cols+1:end);
-    ax.XTickLabels=fliplr(nombres_clases);
+    ax.XTick=1:13;
+    ax.XTickLabels=fliplr(ambientes);
+    ax.YTick=1:nclases;
+    ax.YTickLabels=fliplr(nombres_clases);
     title(title_image)
     
     % guardar

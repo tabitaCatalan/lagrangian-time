@@ -19,15 +19,17 @@ viajes_data = struct2table(sqlite3(eod_db, sql_query));
 % *Cambiar columnas de tipo _cell array_ por array de _doubles_*
 
 % Las celdas vacias se reemplazan por |NaN|
-columnas_malas = [4,9,11,12,18,19,20,21];
+columnas_malas = [4,9,11,12,15,16,18,19,20,21];
 for columna = columnas_malas
     viajes_data{cellfun(@isempty,viajes_data{:,columna}), columna} = {nan};
 end
 
-% Se extraen los valores
+%% Se extraen los valores
 extract_value = @(x) x(1);
 viajes_data.ocupacion = cellfun(extract_value, viajes_data{:,4});
 viajes_data.proposito = cellfun(extract_value, viajes_data{:,9});
+viajes_data.comuna_origen = cellfun(extract_value, viajes_data{:,15});
+viajes_data.comuna_destino = cellfun(extract_value, viajes_data{:,16});
 viajes_data.xo = cellfun(extract_value, viajes_data{:,18});
 viajes_data.yo = cellfun(extract_value, viajes_data{:,19});
 viajes_data.xd = cellfun(extract_value, viajes_data{:,20});
@@ -44,4 +46,5 @@ viajes_data.hora_fin = cellfun(@extract_frac_hour, viajes_data{:,12});
 % La tabla resultante se guarda en el archivo |viajes.mat|, en la carpeta
 % |results|.
 viajes_data_filename = '..\..\results\viajes';
+viajes_data = viajes_data{:,:};
 save(viajes_data_filename, 'viajes_data')

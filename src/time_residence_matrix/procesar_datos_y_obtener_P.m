@@ -25,15 +25,18 @@ function [P, ambientes, nombres_clases, total_por_clase] = procesar_datos_y_obte
     %   cantidad de personas consideradas en cada clase
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    % load Data, datos de todos los viajes realizados. 
-    load('Data.mat','Data')
+    % load viajes_data, datos de todos los viajes realizados. Esto carga
+    % una estructura.
+    viajes_data = load('../../results/viajes.mat','viajes_data');
+    % Se extrae la matriz de viajes
+    viajes_data = viajes_data.viajes_data;
 
     ambientes = get_ambientes();
 
     % Procesar viajeros (personas que hicieron al menos un viaje)
     indices_viajeros = identificar_viajeros();
-    [nclases, clase_personas, ~, nombres_clases, temporada, tipo_dia] = obtener_clases(considerar_nvl_socioecono, tpo_nvl_socio);
-    [residencia_por_viaje, bad_index] = procesar_viajes(Data,indices_viajeros);
+    [nclases, clase_personas, ~, nombres_clases, ~, ~] = obtener_clases(considerar_nvl_socioecono, tpo_nvl_socio);
+    [residencia_por_viaje, bad_index] = procesar_viajes(viajes_data,indices_viajeros);
     [tpo_en_ambiente, viajeros_por_clase] = tiempo_por_clase_vs_ambientes_viajeros(...
         residencia_por_viaje, bad_index, clase_personas, nclases);
 

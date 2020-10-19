@@ -1,0 +1,174 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Script para construccion de matriz P</title><meta name="generator" content="MATLAB 9.4"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2020-10-19"><meta name="DC.source" content="estudiar_Ps.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h1>Script para construccion de matriz P</h1><!--introduction--><p>Autor: Tabita Catal&aacute;n</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Par&aacute;metros</a></li><li><a href="#2">Visualizacion</a></li><li><a href="#3">Exportar a .mat</a></li></ul></div><h2 id="1">Par&aacute;metros</h2><p>El usuario debe definir algunos par&aacute;metros.</p><p><tt>considerar_nvl_socioecono</tt> dice si la matriz P incluye el criterio del nivel socioeconomico. Si es <tt>false</tt>, solo considera edad y sexo. Si es <tt>true</tt>, se necesita adicionalmente definir la variable <tt>tipo_nvl_socio</tt>.</p><p><tt>tipo_nvl_socio</tt> dice la forma en que se calcula el nivel socioeconomico. Hay 4 opciones:</p><div><ul><li><tt>promedio</tt>: asigna a todos los habitantes del hogar un tramo asociado al ingreso per capita del hogar.</li><li><tt>maximo</tt>: asigna a todos los habitantes del hogar el mayor tramo de ingreso final de la EOD de entre todos los miembros del hogar.</li><li><tt>ips</tt>: basado en el IPS de la comuna donde reside la persona.</li><li><tt>pobreza</tt>: basado en la tasa de pobreza de la comuna donde reside la persona.</li></ul></div><p>Si <tt>considerar_no_viajeros</tt> es <tt>true</tt>, entonces se incluye en el calculo de la matriz a las personas que no realizaron viajes.</p><p>Si <tt>restar_horas_sueno</tt> es <tt>true</tt>, entonces se descuenta 7/24 de la primera columna (es decir, se reduce en 7 horas el tiempo en el hogar). Notar que esto necesariamente genera una matriz P que NO cumple <img src="estudiar_Ps_eq01063915546961536250.png" alt="$\sum_{j}P_{ij}=1$" style="width:67px;height:18px;"> para cada <img src="estudiar_Ps_eq05671228016298599287.png" alt="$i$" style="width:4px;height:10px;">, o sea, que no suma 1 por filas.</p><p>A priori, la matriz <img src="estudiar_Ps_eq02661806082982697695.png" alt="$P$" style="width:11px;height:10px;"> obtenida no va a sumar 1 por filas. <tt>modo_normalizacion</tt> permite corregirlo. Las opciones son:</p><div><ul><li>0: no normalizar</li><li>1: se corrige cambiando el ultimo ambiente (otros). Altamente NO recomendable si <tt>restar_horas_sueno</tt> es <tt>true</tt>.</li><li>2: se corrige dividiendo por el total por fila.</li></ul></div><pre class="codeinput">considerar_nvl_socioecono = true;
+tipo_nvl_socio = <span class="string">'pobreza'</span>;
+considerar_no_viajeros = true;
+restar_horas_sueno = true;
+modo_normalizacion = 0;
+
+
+<span class="comment">% Se calcula P. Se obtiene ademas un listado de los nombres de los</span>
+<span class="comment">% ambientes y las clases usadas, y un arreglo del total de personas</span>
+<span class="comment">% consideradas en cada clase.</span>
+[P, ambientes, nombres_clases, total_por_clase] = procesar_datos_y_obtener_P(<span class="keyword">...</span>
+    considerar_nvl_socioecono, considerar_no_viajeros, restar_horas_sueno, <span class="keyword">...</span>
+    modo_normalizacion, tipo_nvl_socio);
+</pre><pre class="codeoutput">     0
+
+
+ans =
+
+    18    13
+
+
+ans =
+
+    18     1
+
+</pre><h2 id="2">Visualizacion</h2><p>Tambien hay algunos par&aacute;metros definidos por el usuario para graficar la matriz resultante.</p><p>Si <tt>tomar_log</tt> es <tt>true</tt>, entonces se grafica <img src="estudiar_Ps_eq09643302668308098337.png" alt="$\log_2{P}$" style="width:38px;height:14px;"> en lugar de <img src="estudiar_Ps_eq02661806082982697695.png" alt="$P$" style="width:11px;height:10px;">.</p><p>Las primeras columnas de la matriz <img src="estudiar_Ps_eq02661806082982697695.png" alt="$P$" style="width:11px;height:10px;"> suelen ser varios &oacute;rdenes de magnitud mayor a las dem&aacute;s, ya que corresponden a los ambientes <i>Hogar</i>, <i>Trabajo</i> y <i>Estudios</i>. Para comparar mejor los tiempos invertidos en los otros ambientes es posible quitar las primeras columnas de la visualizaci&oacute;n. <tt>quitar_columnas</tt> es el n&uacute;mero de columnas eliminadas.</p><pre class="codeinput">tomar_log = false;
+quitar_columnas = 0;
+
+<span class="comment">% Graficar la matriz P.</span>
+nclases = length(total_por_clase);
+ver_P(P, considerar_nvl_socioecono,<span class="keyword">...</span>
+    considerar_no_viajeros, restar_horas_sueno, modo_normalizacion, <span class="keyword">...</span>
+    ambientes, nclases, nombres_clases, tomar_log, tipo_nvl_socio, quitar_columnas)
+</pre><img vspace="5" hspace="5" src="P- Peconopobreza1-no_viaj1-restarsueno1-log0-delcol0-norm0.svg" alt=""> <h2 id="3">Exportar a .mat</h2><p>Los datos obtenidos se guardan en un archivo <tt>.mat</tt>.</p><pre class="codeinput">save(<span class="string">'../../results/Pdata.mat'</span>, <span class="string">'P'</span>, <span class="string">'ambientes'</span>, <span class="string">'nombres_clases'</span>, <span class="string">'total_por_clase'</span>)
+</pre><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2018a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%% Script para construccion de matriz P
+% Autor: Tabita Catalán
+%% Parámetros
+% El usuario debe definir algunos parámetros.
+%
+% |considerar_nvl_socioecono| dice si la matriz P incluye el criterio del
+% nivel socioeconomico. Si es |false|, solo considera edad y sexo. Si es
+% |true|, se necesita adicionalmente definir la variable |tipo_nvl_socio|.
+%
+% |tipo_nvl_socio| dice la forma en que se calcula el nivel socioeconomico.
+% Hay 4 opciones:
+%
+% * |promedio|: asigna a todos los habitantes del hogar un tramo asociado al ingreso per capita del hogar.
+% * |maximo|: asigna a todos los habitantes del hogar el mayor tramo de ingreso final de la EOD de entre todos los miembros del hogar.
+% * |ips|: basado en el IPS de la comuna donde reside la persona.
+% * |pobreza|: basado en la tasa de pobreza de la comuna donde reside la persona.
+%
+% Si |considerar_no_viajeros| es |true|, entonces se incluye en el calculo
+% de la matriz a las personas que no realizaron viajes.
+%
+% Si |restar_horas_sueno| es |true|, entonces se descuenta 7/24 de la
+% primera columna (es decir, se reduce en 7 horas el tiempo en el hogar).
+% Notar que esto necesariamente genera una matriz P que NO cumple
+% $\sum_{j}P_{ij}=1$ para cada $i$, o sea, que no suma 1 por filas.
+%
+% A priori, la matriz $P$ obtenida no va a sumar 1 por filas. |modo_normalizacion|
+% permite corregirlo. Las opciones son:
+%
+% * 0: no normalizar
+% * 1: se corrige cambiando el ultimo ambiente (otros). Altamente NO recomendable si |restar_horas_sueno| es |true|.
+% * 2: se corrige dividiendo por el total por fila.
+considerar_nvl_socioecono = true;
+tipo_nvl_socio = 'pobreza';
+considerar_no_viajeros = true;
+restar_horas_sueno = true;
+modo_normalizacion = 0; 
+
+
+% Se calcula P. Se obtiene ademas un listado de los nombres de los
+% ambientes y las clases usadas, y un arreglo del total de personas
+% consideradas en cada clase.
+[P, ambientes, nombres_clases, total_por_clase] = procesar_datos_y_obtener_P(...
+    considerar_nvl_socioecono, considerar_no_viajeros, restar_horas_sueno, ...
+    modo_normalizacion, tipo_nvl_socio);
+%% Visualizacion
+% Tambien hay algunos parámetros definidos por el usuario para graficar la
+% matriz resultante.
+%
+% Si |tomar_log| es |true|, entonces se grafica $\log_2{P}$ en lugar de $P$.
+%
+% Las primeras columnas de la matriz $P$ suelen ser varios órdenes de
+% magnitud mayor a las demás, ya que corresponden a los ambientes _Hogar_,
+% _Trabajo_ y _Estudios_. Para comparar mejor los tiempos invertidos en los
+% otros ambientes es posible quitar las primeras columnas de la
+% visualización. |quitar_columnas| es el número de columnas eliminadas.
+
+tomar_log = false;
+quitar_columnas = 0;
+
+% Graficar la matriz P.
+nclases = length(total_por_clase);
+ver_P(P, considerar_nvl_socioecono,...
+    considerar_no_viajeros, restar_horas_sueno, modo_normalizacion, ...
+    ambientes, nclases, nombres_clases, tomar_log, tipo_nvl_socio, quitar_columnas)
+%% Exportar a .mat
+% Los datos obtenidos se guardan en un archivo |.mat|.
+save('../../results/Pdata.mat', 'P', 'ambientes', 'nombres_clases', 'total_por_clase')
+
+##### SOURCE END #####
+--></body></html>
