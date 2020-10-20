@@ -54,6 +54,9 @@ Obtenido de [www.desarrollosocialyfamilia.gob.cl](http://www.desarrollosocialyfa
 - Actualización y recolección de información del sistema de transporte urbano, IX Etapa: Encuesta Origen Destino Santiago 2012. Encuesta origen destino de viajes 2012 (Documento Difusión). Obtenido de [SECTRA](http://www.sectra.gob.cl/biblioteca/detalle1.asp?mfn=3253).
 - Tasa de pobreza comunal. Obtenido de [Observatorio Social](http://observatorio.ministeriodesarrollosocial.gob.cl/indicadores/datos_pobreza_comunal.php) el 17 de octubre de 2020.
 
+
+Encuesta Origen-Destino Gran Valparaíso. Obtenido de [datos.gob.cl](https://datos.gob.cl/dataset/eod-valpo-2014) el 19 de octubre de 2020.
+
 # Anexo: Modificaciones a los datos.
 
 ## Datos de Movilidad del ISCI

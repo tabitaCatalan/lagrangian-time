@@ -57,3 +57,4 @@ Tramo | IPS mínimo | IPS máximo
 Para generar los tramos a los que pertenece cada persona en cada uno de los criterios se usa la consulta `clases-query.sql`.
 
 ## Calcular la matriz
+Se usa el script `estudiar_Ps.m`. Hay varios parámetros que pueden ser ajustados por el usuario. Ver la documentación para más detalles.
