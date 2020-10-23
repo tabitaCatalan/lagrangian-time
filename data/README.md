@@ -57,6 +57,8 @@ Obtenido de [www.desarrollosocialyfamilia.gob.cl](http://www.desarrollosocialyfa
 
 Encuesta Origen-Destino Gran Valparaíso. Obtenido de [datos.gob.cl](https://datos.gob.cl/dataset/eod-valpo-2014) el 19 de octubre de 2020.
 
+Movilidad de Google. Obtenido de [Informes de Movilidad Local sobre el COVID-19](https://www.google.com/covid19/mobility/) el 22 de octubre de 2020.
+
 # Anexo: Modificaciones a los datos.
 
 ## Datos de Movilidad del ISCI
@@ -74,6 +76,36 @@ Eso se cambió por cuatro columnas:
 -40 | -21| -100 |-61
 
 
+## Movilidad de Google
+El archivo original contenía datos de todas las regiones para varios países. Se conservaron los datos de Chile para la región metropolitana. Para hacer más rápido el procecso se usó la búsqueda por expresiones regulares de VSCode. Buscar`(^.*Metropolitan.*$)|(^.*$)` y reemplazar por `$1` elimina todas las filas que no contienen la palabra `Metropolitana`. Esto deja muchas filas en blanco, que pueden eliminarse reemplazando `\n\n` por nada.
+
+Además, la movilidad de referencia considerada era el promedio de las 5 semanas entre el 3 de enero y el 6 de febrero. Esa no es una buena línea de referencia para Chile, puesto que esa fecha corresponde a las vacaciones. Para corregirlo hacemos lo siguiente: 
+
+Supongamos lo siguiente:
+- $x_0$: alguna cantidad desconocida correspondiente a un día 0: línea base.
+- $p_i$: porcentaje conocido de variación de esa cantidad, correspondiente al día $i$, de tal manera que $x_i = (1+ \frac{p_i}{100})x_0$. Notamos que, puesto que no conocemos $x_0$, tampoco conocemos $x_i$.
+
+Nos interesa encontrar valores $p_i'$ que sean variaciones con respecto a una nueva línea base $x_0'$, es decir, que $x_i = (1+\frac{p_i'}{100})x_0'$. Si suponemos que conocemos $p$ tal que $x_0' = (1+\frac{p}{100})x_0$, entonces un cálculo simple nos dice que $p_i' = \frac{p_i-p}{1+\frac{p}{100}}$: esto pues 
+
+$$
+x_i = \left(1+ \frac{p_i}{100}\right)x_0 
+= \frac{1+ \frac{p_i}{100}}{1+ \frac{p}{100}} x_0'
+= \left( 1 + \frac{\frac{p_i - p}{100}}{1 + \frac{p}{100}}\right)x_0' = \left(1 + \frac{1}{100} \cdot \frac{p_i - p}{1 + \frac{p}{100}}\right) x_0'
+$$
+
+Los valores base usados fueron el promedio de la semana del 9-15 de marzo; la única normal. Solo se consideraron los días laborales (lunes-viernes).
+
+La siguiente tabla muestra los porcentajes de variación con respecto al valor desconocido de enero-febrero.
+|  Fecha   | Recreación | Compras | Parques | Transporte | Trabajo | Residencia |
+|---|---|---|---|---|---|---|
+| 2020-03-09 | 1  | 12  | 17  |9  | 14  | 0 |
+| 2020-03-10 | 3  | 11  | 7   | 12  | 16 | -2 |
+| 2020-03-11 | -3 | 6  | 10 | 12  | 14 | 0 |
+| 2020-03-12 | 0 | 10 | 5  | 10 | 15| -1 |
+| 2020-03-13 | 0 | 15 | 5 | 6 | 15 | 0 |
+<!--| 2020-03-14 | 6 | 19 | 6 | 3 | 3 | 3 |
+| 2020-03-15 | -3  | 30  | -5 | -4 | -3| 5 |-->
+|**Promedios** ($p$)|0.2|10.8|8.8|9.8|14.8|-0.6|
 
 ## Encuesta Origen-Destino
 Se trabajó con SQLite. El archivo `EOD2012-Santiago.db` fue modificado para agregar más información. Se agregaron las siguientes tablas:

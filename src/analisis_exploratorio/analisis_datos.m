@@ -67,7 +67,7 @@ C2=categorical(proposito,[1 2 9 10 11 3 4 6 8 12 13 5 14 7],...
     proposito_categorias2);
 figure('Position',[301 137 1454 733]);
 H=histogram(C2,'Normalization','probability');
-title('Frecuencia de prop?sitos de viajes')
+title('Frecuencia de propositos de viajes')
 ylabel('fracci?n')
 %% origen-destino
 xo=Data(:,18);
