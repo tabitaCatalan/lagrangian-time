@@ -6,6 +6,7 @@ Resuelve un modelo epidemiológico y grafica los resultados.
 cd(@__DIR__)
 # cd("src") # descomentar si hay error al incluir los archivos
 
+include("MatrixP.jl")
 include("EpidemicModel.jl")
 include("PlottingModel.jl")
 
