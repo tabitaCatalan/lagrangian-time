@@ -11,8 +11,10 @@ include("EpidemicModel.jl")
 include("PlottingModel.jl")
 
 
-P_normal, total_por_clase, nombre_ambientes, nombre_clases = read_matlab_data("..\\results\\Pdata.mat")
+
+P_normal, total_por_clase, nombre_ambientes, nombre_clases = read_matlab_data("..\\..\\results\\Pdata.mat")
 suma_uno_por_fila!(P_normal)
+
 δ = calcular_delta(P_normal)
 
 P_cuarentena = copy(P_normal)

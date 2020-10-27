@@ -1,10 +1,10 @@
 /*
 Query población e índice por comunas
 */
-SELECT --PoblaTotalComuna.id_comuna, 
+SELECT PoblaTotalComuna.id_comuna, 
 Tramo.tramo_pobreza AS tramo_pobreza,
-SUM(PoblaTotalComuna.poblacion) AS poblacion_total,
-(SUM(PoblaTotalComuna.poblacion)/Total.total) AS frac_poblacion
+(PoblaTotalComuna.poblacion) AS poblacion_total,
+((PoblaTotalComuna.poblacion)/Total.total) AS frac_poblacion
 FROM 
 (
     SELECT id_comuna, (SUM(hombres) + SUM(mujeres)) AS poblacion
@@ -22,4 +22,4 @@ FROM
     FROM TasaPobreza
 ) AS Tramo
 WHERE Tramo.id_comuna = PoblaTotalComuna.id_comuna
-GROUP BY Tramo.tramo_pobreza
+--GROUP BY Tramo.tramo_pobreza
