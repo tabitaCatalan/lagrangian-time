@@ -72,8 +72,10 @@ Modelo epidemiológico tipo SEIIR
 - `t`:
 """
 function seiir!(du,u::ComponentArray,p,t)
-    αₑ, αᵢₘ, β, ν, φ, γ, γₘ, P = p
-    λ = Array{Float64, 1}(undef, size(P_normal)[1])
+    αₑ, αᵢₘ, β, ν, φ, γ, γₘ = p
+    λ = Array{Float64, 1}(undef, size(u.P_normal)[1])
+    P = similar(u.P_normal)
+    matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t), :])
     calcular_lambda!(λ, αₑ, αᵢₘ, β, P, u.S, u.E, u.I, u.Im, u.R)
     du.S  = -λ .* u.S
     du.E  = λ .* u.S - ν * u.E

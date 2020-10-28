@@ -78,6 +78,8 @@ dias = 6
 γᵢ = 1/dias; γᵢₘ = 1/dias;
 
 
+data_u0 = MyDataArray(u0, P_normal, P_cuarentena, frac)
+
 
 tspan = (0.0,500.0)
 τ = 400. # tiempo de implementar medidas
@@ -85,7 +87,7 @@ tspan = (0.0,500.0)
 
 s,e,im,i,r = index_estados(n_clases)
 
-p1 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, P_normal)
+p1 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ)
 p2 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ,P_cuarentena)
 p3 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_normal)
 p4 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_trabajo_normal)
@@ -100,7 +102,7 @@ extension = ".svg"
 ### Resolver
 save_at = 2.
 
-prob_normal = ODEProblem(seiir!,u0,tspan,p1)
+prob_normal = ODEProblem(seiir!,data_u0,tspan,p1)
 sol_normal = solve(prob_normal, saveat = save_at)
 
 prob_cuarentena = remake(prob_normal; p = p2)
