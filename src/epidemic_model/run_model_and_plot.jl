@@ -7,9 +7,9 @@ cd(@__DIR__)
 # cd("src") # descomentar si hay error al incluir los archivos
 
 include("MatrixP.jl")
+include("CallbackTests.jl")
 include("EpidemicModel.jl")
 include("PlottingModel.jl")
-
 
 
 P_normal, total_por_clase, nombre_ambientes, nombre_clases = read_matlab_data("..\\..\\results\\Pdata.mat")
@@ -72,47 +72,55 @@ total_por_clase = total_por_clase_censo/10
 
 u0 = set_up_inicial_conditions(total_por_clase)
 
+
+data_cuarentenas, numero_dias = read_data_cuarentena("..\\..\\data\\CuarentenasRM.csv")
+tramos_df = read_db("..\\..\\data\\EOD2012-Santiago.db", "query-poblacion-clase.sql")
+frac = calcular_frac_cuarentena(numero_dias, data_cuarentenas, tramos_df)
+
+data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac)
+
 #αᵢₘ = 0.15; αₑ = aᵢₘ/2
-αᵢₘ = 0.4; αₑ = αᵢₘ/2; β = 1.5; γₑ = 0.14; φ = 0.1; β₂ = 3.
-dias = 6
+αᵢₘ = 0.4; αₑ = αᵢₘ/2; β = 3.; γₑ = 0.14; φ = 0.1; β₂ = 3.
+dias = 10
 γᵢ = 1/dias; γᵢₘ = 1/dias;
 
-
-data_u0 = MyDataArray(u0, P_normal, P_cuarentena, frac)
-
-
-tspan = (0.0,500.0)
-τ = 400. # tiempo de implementar medidas
+tspan = (0.0,120.0)
+τ = 100. # tiempo de implementar medidas
 
 
 s,e,im,i,r = index_estados(n_clases)
 
 p1 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ)
+#=
 p2 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ,P_cuarentena)
 p3 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_normal)
 p4 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_trabajo_normal)
 p5 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_con_clases)
 p6 = set_up_parameters3(αₑ, αᵢₘ, β, β₂, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena)
-
+=#
 output_folder = "../img/presentacion-investigadores/"
 filename = make_filename(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ)
 extension = ".svg"
 
 
 ### Resolver
-save_at = 2.
+save_at = 1.
 
-prob_normal = ODEProblem(seiir!,data_u0,tspan,p1)
-sol_normal = solve(prob_normal, saveat = save_at)
 
+prob_cuarentena = ODEProblem(seiir!,MyDataArray(u0, P_normal, P_cuarentena, frac),tspan,p1)
+sol_cuarentena = solve(prob_normal, saveat = save_at);
+
+prob_normal = ODEProblem(seiir!, MyDataArray(u0, P_normal, P_normal, frac), tspan, p1)
+sol_normal = solve(prob_cuarentena, save_at = save_at);
+#=
 prob_cuarentena = remake(prob_normal; p = p2)
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
-
+=#
 
 
 plot_all_states(sol_normal, n_clases, nombre_clases; indexs = joven)
 
-
+#=
 plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
 
 
@@ -148,17 +156,17 @@ plot_nuevos_contagios(
     labels = ["Cuarentena siempre" "Retomar clases en t=$τ" "Vuelta al trabajo en t=$τ" "Eliminar mascarillas en t=$τ"];
     title = "Contagios diarios")
 savefig(output_folder*"comparar_nuevos_contagios2456"*filename*extension)
-
+=#
 
 plot_nuevos_contagios(
-    (sol_normal, sol_cuarentena),
+    [sol_normal, sol_cuarentena],
     n_clases,
     labels = ["Sin medidas preventivas" "Teletrabajo y cierre de centros educativos "];
     title = "Contagios diarios")
 plot!(legend=:topright)
 savefig(output_folder*"comparar_nuevos_contagios12"*filename*extension)
 
-
+#=
 
 plot_compare_function_of_sols_grouping(
     (sol_cuarentena, sol_retormar_trabajo),
@@ -372,7 +380,7 @@ plot_all_states(sol2, n_clases, nombre_clases;indexs = clase_baja)
 
 
 plot_nuevos_contagios(sol2, nombre_clases)
-#=
+
 plot_compare_function_of_sols_grouping(
     (sol1, sol2),
     (joven, adulto, mayor),

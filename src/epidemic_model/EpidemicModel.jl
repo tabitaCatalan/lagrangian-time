@@ -71,17 +71,19 @@ Modelo epidemiológico tipo SEIIR
   - `η`: tasa de muerte
 - `t`:
 """
-function seiir!(du,u::ComponentArray,p,t)
+function seiir!(du::MyDataArray{Float64},u::MyDataArray{Float64},p,t)
     αₑ, αᵢₘ, β, ν, φ, γ, γₘ = p
-    λ = Array{Float64, 1}(undef, size(u.P_normal)[1])
+    # Calcular psrametros a tiempo t
     P = similar(u.P_normal)
-    matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t), :])
-    calcular_lambda!(λ, αₑ, αᵢₘ, β, P, u.S, u.E, u.I, u.Im, u.R)
-    du.S  = -λ .* u.S
-    du.E  = λ .* u.S - ν * u.E
-    du.I  = φ * ν * u.E - γ * u.I
-    du.Im = (1.0 - φ) * ν * u.E - γₘ * u.Im
-    du.R  = γₘ * u.Im + γ * u.I
+    matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t)+1, :])
+    λ = Array{Float64, 1}(undef, size(u.P_normal)[1])
+    calcular_lambda!(λ, αₑ, αᵢₘ, β, P, u.x.S, u.x.E, u.x.I, u.x.Im, u.x.R)
+    # Calcular derivada
+    du.x.S  = -λ .* u.x.S
+    du.x.E  = λ .* u.x.S - ν * u.x.E
+    du.x.I  = φ * ν * u.x.E - γ * u.x.I
+    du.x.Im = (1.0 - φ) * ν * u.x.E - γₘ * u.x.Im
+    du.x.R  = γₘ * u.x.Im + γ * u.x.I
 end;
 
 function calcular_lambda!(λ, αₑ, αᵢₘ, β, P, S, E, I, Iᵐ, R)
@@ -153,13 +155,13 @@ gm = 0.55
 phi = 0.4 en [0,1]
 nu = 0.14
 """
-function set_up_parameters(a₁,a₂, beta, nu, phi, gi, gm, P)
+function set_up_parameters(a₁,a₂, beta, nu, phi, gi, gm)
     β = beta*get_riesgos()
     #ν = nu*ones(n_clases)
     #φ = phi
     #γ = gi*ones(n_clases)
     #γₘ = gm*ones(n_clases)
-    p = (a₁,a₂, β, nu, phi, gi, gm, P)
+    p = (a₁,a₂, β, nu, phi, gi, gm)
     #p = (a₁,a₂, β, ν, φ, γ, γₘ, P)
     return p
 end

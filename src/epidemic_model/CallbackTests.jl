@@ -18,7 +18,7 @@ using DataFrames
 """
     read_data_cuarentena(csv_cuarentena; delim = ';')
 # Argumentos 
-- `csv_cuarentena::String`: path al csv con la serie de tiempo correspondientes a la cuarentena por dia y comuna. 
+- `csv_cuarentena::String`: path al csv con la serie de tiempo correspondiente a la cuarentena por dia y comuna. 
 Se espera que sea de la forma 
 ```
 fecha; comuna_1; comuna_2; ...
@@ -32,7 +32,6 @@ function read_data_cuarentena(csv_cuarentena; delim = ';')
     numero_dias = length(timestamp(data_cuarentenas))
     data_cuarentenas, numero_dias
 end
-data_cuarentenas, numero_dias = read_data_cuarentena("..\\..\\data\\CuarentenasRM.csv")
 
 """
     read_db(eod_db, sql_query)
@@ -55,17 +54,15 @@ function read_db(eod_db, sql_query)
     result_df
 end
 
-tramos_df = read_db("..\\..\\data\\EOD2012-Santiago.db", "query-poblacion-clase.sql")
-tramo_pobreza = tramos_df.tramo_pobreza # tramos por comuna
-pobla_por_comuna = tramos_df.poblacion_total
-
 
 """
-    calcular_frac_en_cuarentena!(frac, tiempo)
+    calcular_frac_cuarentena_en_t!(frac, tiempo)
 Calcula la fracción de personas en cuarentena.
 # Argumentos
 - `frac`: array preallocated. Aquí se guarda la solución.
 - `tiempo`: debe ser menor que la variable `numero_dias`
+- `data_cuarentenas::TimeSeries`
+- `df::DataFrame`
 Se usan los siguientes datos:
 ┌───────────────┬─────────────────┬───────────────────┐
 │ tramo_pobreza │ poblacion_total │  frac_poblacion   │
@@ -75,28 +72,38 @@ Se usan los siguientes datos:
 │ 3             │ 1585260         │ 0.22287400419075  │
 └───────────────┴─────────────────┴───────────────────┘
 """
-function calcular_frac_en_cuarentena!(frac, tiempo)
+function calcular_frac_cuarentena_en_t!(frac, tiempo, data_cuarentenas, df)
     t_floor = floor(Int, tiempo)
     cuarentenas_en_t = values(data_cuarentenas[t_floor])'
     comunas_sin_cuarentena = [34, 42, 44, 46, 47, 50]
     f = i -> in(i, comunas_sin_cuarentena)
     comunas_con_cuarentena = .!f.(1:52)
+    pobla_por_comuna = df.poblacion_total
     pobla_en_cuarentena = similar(pobla_por_comuna)
     pobla_en_cuarentena[comunas_sin_cuarentena] .= 0
     pobla_en_cuarentena[comunas_con_cuarentena] = pobla_por_comuna[comunas_con_cuarentena] .* cuarentenas_en_t
-    frac_t1 = sum(pobla_en_cuarentena[tramo_pobreza .== 1])/2456390
-    frac_t2 = sum(pobla_en_cuarentena[tramo_pobreza .== 2])/3071158
-    frac_t3 = sum(pobla_en_cuarentena[tramo_pobreza .== 3])/1585260
+    frac_t1 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 1])/2456390
+    frac_t2 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 2])/3071158
+    frac_t3 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 3])/1585260
     frac[t_floor,1] = frac_t1 
     frac[t_floor,2] = frac_t2
     frac[t_floor,3] = frac_t3
 end
 
-frac = zeros(numero_dias, 3)
-for i in 1:numero_dias
-    calcular_frac_en_cuarentena!(frac,i)
+"""
+    calcular_frac_cuarentena(df, numero_dias)
+# Argumentos 
+- `numero_dias`
+- `data_cuarentenas::TimeSeries`
+- `df::DataFrame`
+"""
+function calcular_frac_cuarentena(numero_dias, data_cuarentenas, df)
+    frac = zeros(numero_dias, 3)
+    for i in 1:numero_dias
+        calcular_frac_cuarentena_en_t!(frac,i, data_cuarentenas, df)
+    end
+    frac
 end
-
 
 """
     matrix_ponderation!(P, P_normal, P_cuarentena, frac_cuarentena_por_clase)
@@ -137,7 +144,7 @@ Esta estructura está pensada para ser usada en el modelo de **EpidemicModel.jl*
     en cuarentena el día `i`.
 """
 struct MyDataArray{T} <: DEDataArray{T,1}
-    x::ComponentArray{T,1}
+    x::ComponentVector{T}
     P_normal::Array{T,2}
     P_cuarentena::Array{T,2}
     frac_pobla_cuarentena::Array{T,2}
