@@ -1,0 +1,115 @@
+
+---
+title: Análisis exploratorio de los datos de movilidad de Google
+author: Tabita Catalán
+date: 29 de octubre de 2020
+---
+
+
+# Introducción
+
+Google ha puesto a disposición de la comunidad datos
+anonimizados que usan en Google Maps, con el fin de
+ayudar en la toma de decisiones relacionadas a la pandemia
+por Covid-19. Estos datos están disponibles durante el
+desarrollo de la pandemia
+[aquí](https://www.google.com/covid19/mobility/).
+
+Se estudia los datos de Chile correspondientes a la
+Región Metropolitana de Santiago. El archivo usado
+es `MovilidadGoogleSantiago.csv`, en la carpeta [data](../../data/).
+
+# Leer los datos
+Usaremos el paquete **TimeSeries.jl**. Leemos los datos y los graficamos.
+```{julia; fig_ext=".svg"}
+using TimeSeries, Plots
+
+csv_cuarentena = "..\\..\\data\\MovilidadGoogleSantiago.csv"
+mov_google = readtimearray(csv_cuarentena; delim = ',')
+numero_dias = length(timestamp(mov_google))
+
+plot(mov_google[:recreacion, :compras, :parques, :transporte, :trabajo, :hogar])
+```
+## Correción de la línea base
+
+Notamos que la movilidad de referencia considerada era el
+promedio de las 5 semanas entre el 3 de enero y el 6 de
+febrero. Esa no es una buena línea de referencia para Chile,
+puesto que esa fecha corresponde a las vacaciones.
+Para corregirlo hacemos lo siguiente:
+
+Supongamos lo siguiente:
+- La línea base es alguna cantidad desconocida $x_0$ correspondiente a un día 0.
+- Se conoce $p_i$, el porcentaje de variación de esa cantidad, correspondiente al día $i$, de tal manera que $x_i = (1+ \frac{p_i}{100})x_0$. Notamos que, puesto que no conocemos $x_0$, tampoco conocemos $x_i$.
+
+Nos interesa encontrar valores $p_i'$ que sean variaciones
+con respecto a una nueva línea base $x_0'$, es decir, que
+$x_i = (1+\frac{p_i'}{100})x_0'$. Si suponemos que conocemos
+$p$ tal que $x_0' = (1+\frac{p}{100})x_0$, entonces un
+cálculo simple
+
+$$
+x_i = \left(1+ \frac{p_i}{100}\right)x_0
+= \frac{1+ \frac{p_i}{100}}{1+ \frac{p}{100}} x_0'
+= \left( 1 + \frac{\frac{p_i - p}{100}}{1 + \frac{p}{100}}\right)x_0' = \left(1 + \frac{1}{100} \cdot \frac{p_i - p}{1 + \frac{p}{100}}\right) x_0'
+$$
+nos dice que
+$$p_i' = \frac{p_i-p}{1+\frac{p}{100}}.$$
+
+Los valores base usados fueron el promedio de la semana del
+9-15 de marzo; la única normal. Solo se consideraron los días
+laborales (lunes-viernes).
+
+La siguiente tabla muestra los porcentajes de variación con respecto al valor desconocido de enero-febrero.
+
+```julia; term=true
+mov_google[24:28]
+```
+Calculamos los promedios para cada columna
+```julia
+p = values(sum(mov_google[24:28]) ./5)
+```
+Esto nos permite corregir los datos.
+```julia
+mov_google_corregido = (mov_google .- p) ./(1 .+ p./100);
+```
+Para comparar las dos series creamos la función `plot_comparar_movilidad`.
+```{julia; fig_ext=".svg"}
+"""
+    plot_comparar_movilidad(ts_mov1, ts_mov2; title = "")
+Grafica dos series de tiempo de los datos de movilidad de Google,
+la primera de ellas con mayor transparencia.
+"""
+function plot_comparar_movilidad(ts_mov1, ts_mov2; title = "")
+    ambientes = colnames(ts_mov1)
+    a_plot = plot(title = title)
+    for i in 1:length(ambientes)
+        plot!(a_plot, ts_mov1[ambientes[i]],
+            alpha = 0.2,
+            label = :none, 
+            color = i
+        )
+        plot!(a_plot, ts_mov2[ambientes[i]], 
+            color = i
+        )
+    end
+    a_plot
+end
+plot_comparar_movilidad(mov_google, mov_google_corregido,
+    title = "Comparación entre serie original y corregida"
+)
+
+```
+El color más intenso corresponde a los datos corregidos.
+# Suavizar datos
+
+Calcularemos una media móvil de 3 días de los datos.
+```{julia; fig_ext=".svg"}
+using Statistics
+
+mov_google_mean3 = moving(mean, mov_google_corregido, 10)
+
+plot_comparar_movilidad(mov_google_corregido, mov_google_mean3,
+    title = "Comparación entre serie corregida y media móvil (3 días)"
+)
+```
