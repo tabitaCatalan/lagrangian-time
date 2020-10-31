@@ -72,7 +72,7 @@ total_por_clase = total_por_clase_censo/10
 
 u0 = set_up_inicial_conditions(total_por_clase)
 
-frac = obtener_frac_cuarentena_from_csv(
+frac, = obtener_frac_cuarentena_from_csv(
     "..\\..\\data\\CuarentenasRM.csv",
     "..\\..\\data\\EOD2012-Santiago.db",
     "query-poblacion-clase.sql"

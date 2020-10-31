@@ -24,8 +24,8 @@ Usaremos el paquete **TimeSeries.jl**. Leemos los datos y los graficamos.
 ```{julia; fig_ext=".svg"}
 using TimeSeries, Plots
 
-csv_cuarentena = "..\\..\\data\\MovilidadGoogleSantiago.csv"
-mov_google = readtimearray(csv_cuarentena; delim = ',')
+csv_google = "..\\..\\data\\MovilidadGoogleSantiago.csv"
+mov_google = readtimearray(csv_google; delim = ',')
 numero_dias = length(timestamp(mov_google))
 
 plot(mov_google[:recreacion, :compras, :parques, :transporte, :trabajo, :hogar])
@@ -86,10 +86,10 @@ function plot_comparar_movilidad(ts_mov1, ts_mov2; title = "")
     for i in 1:length(ambientes)
         plot!(a_plot, ts_mov1[ambientes[i]],
             alpha = 0.2,
-            label = :none, 
+            label = :none,
             color = i
         )
-        plot!(a_plot, ts_mov2[ambientes[i]], 
+        plot!(a_plot, ts_mov2[ambientes[i]],
             color = i
         )
     end
@@ -112,4 +112,51 @@ mov_google_mean3 = moving(mean, mov_google_corregido, 10)
 plot_comparar_movilidad(mov_google_corregido, mov_google_mean3,
     title = "Comparación entre serie corregida y media móvil (3 días)"
 )
+```
+# Agregar datos de cuarentenas
+Agregaremos barras grises para mostrar la cantidad de personas en cuarentena.
+[] Corregir, debería ser `frac::TimeSeries`.
+```julia
+include("..\\epidemic_model\\ReadCuarentenaData.jl")
+csv_cuarentena = "..\\..\\data\\CuarentenasRM.csv"
+eod_db = "..\\..\\data\\EOD2012-Santiago.db"
+pobla_query = "..\\epidemic_model\\query-poblacion-clase.sql"
+frac, dias_cuarentena = obtener_frac_cuarentena_from_csv(
+    csv_cuarentena, eod_db, pobla_query, tramos = false
+)
+numero_dias = length(frac)
+```
+Los datos de movilidad de google están disponibles desde el 2020-02-24 hasta el 2020-10-18
+```julia; term=true
+timestamp(mov_google_mean3)[1]
+timestamp(mov_google_mean3)[end]
+```
+Los datos de cuarentenas están disponibles desde el 2020-03-13 hasta el 2020-07-27 (137 días).
+```julia;term=true
+dias_cuarentena[1]
+dias_cuarentena[end]
+```
+Vemos que hay 18 días entre ambos los datos de cuarentenas y los datos de Google.
+```julia;term=true
+dias_cuarentena[1] - timestamp(mov_google_mean3)[1]
+```
+
+Hacemos una función para graficar tiras grises. La intensidad del color depende
+de la fracción de personas en cuarentena ese día.
+```{julia; fig_ext=".svg"}
+function plot_strip!(a_plot,dia::Date, frac_dia)
+    vspan!(a_plot,[dia,dia+Day(1)], alpha = frac_dia, color = :black, label = :none)
+end
+
+a_plot = plot(title = "Media movil de 3 días de los datos de Google y cuarentenas")
+for dia in 1:numero_dias
+    plot_strip!(a_plot, dias_cuarentena[dia], frac[dia])
+end
+ambientes = colnames(mov_google_mean3)
+for i in 1:length(ambientes)
+    plot!(a_plot, mov_google_mean3[ambientes[i]],
+        color = i
+    )
+end
+a_plot
 ```
