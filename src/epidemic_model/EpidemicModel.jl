@@ -6,6 +6,29 @@ Incluye además funciones para leer datos desde MATLAB.
 ## Importar dependencias
 using ComponentArrays
 using DifferentialEquations
+using StaticArrays
+
+"""
+    MyDataArray
+Esta estructura está pensada para ser usada en el modelo de **EpidemicModel.jl**. Surge de la necesidad de tener acceso a variables globales eficientes. Puede usarse en el solver de **DifferentialEquations.jl**.
+# Campos
+- `x`: Estado actual
+- `P_normal`: matriz de tiempos de residencia normal
+    (sin medidas preventivas)
+- `P_cuarentena`: matriz de tiempos de residencia en
+    cuarentena. Del mismo tamaño que `P_normal`.
+- `frac_pobla_cuarentena`: matriz de fraccion de personas
+    en cuarentena dependiendo del tiempo. Es de tamño `numero_dias`x3. En la coordenada `i,j` contiene la
+    fracción de personas de la clase social `j` que están
+    en cuarentena el día `i`.
+"""
+struct MyDataArray{T} <: DEDataArray{T,1}
+    x::ComponentVector{T}
+    P_normal::Array{T,2}
+    P_cuarentena::Array{T,2}
+    frac_pobla_cuarentena::Array{T,2}
+end
+
 
 """
     index_clases()
@@ -55,6 +78,27 @@ function index_edad()
     return joven, adulto, mayor
 end
 
+
+"""
+    matrix_ponderation!(P, P_normal, P_cuarentena, frac_cuarentena_por_clase)
+Recibe la fracción de personas en cuarentena en cada clase social. Devuelve la
+matriz P que es una ponderación de la matriz P en condiciones normales y en
+cuarentena.
+# Argumentos
+- `P`: preallocated matrix
+    Para guardar el resultado
+- `P_normal:` matrix de tiempos de residencia normal
+- `P_cuarentena`: matriz de tiempos de residencia en cuarentena total
+- `frac_cuarentena_por_clase`: fracción de personas en cuarentena por clase
+    - `frac_cuarentena_por_clase[1]`: clase baja
+    - `frac_cuarentena_por_clase[2]`: clase media
+    - `frac_cuarentena_por_clase[3]`: clase alta
+"""
+function matrix_ponderation!(P, P_normal, P_cuarentena, frac_cuarentena_por_clase)
+    mapping = @SArray [1,1,2,2,3,3,1,1,2,2,3,3,1,1,2,2,3,3] # 0.000022 seconds  (4 allocations: 6.062 KiB)
+    # mapping = [1,1,2,2,3,3,1,1,2,2,3,3,1,1,2,2,3,3] # 0.000017 seconds (7 allocations: 6.719 KiB)
+    P .= frac_cuarentena_por_clase[mapping] .* P_cuarentena + (1 .- frac_cuarentena_por_clase[mapping]) .* P_normal
+end
 
 """
     seiir!(du,u,p,t)
