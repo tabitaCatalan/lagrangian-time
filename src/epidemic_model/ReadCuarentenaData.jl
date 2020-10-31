@@ -16,13 +16,13 @@ using DataFrames
     read_data_cuarentena(csv_cuarentena; delim = ';')
 # Argumentos
 - `csv_cuarentena::String`: path al csv con la serie de tiempo correspondiente a la cuarentena por dia y comuna.
-Se espera que sea de la forma
+# Salida
+- `data_cuarentena::TimeSeries`  (fechas en las filas, comunas en las columnas)
+- `numero_dias`: cuantos dias están considerados en los datos.
+# Ejemplo
+```julia
+data_cuarentenas, numero_dias = read_data_cuarentena('..\\..\\data\\CuarentenasRM.csv'; delim = ';')
 ```
-fecha; comuna_1; comuna_2; ...
-2020-03-27; 0;1;
-```
-La fecha debe estar en formato `YYYY-MM-DD`. Los datos son binarios, indicando si la comuna se encontraba o no en cuarentena ese día.
-- `delim = ';'`: opcional, delimitador de columna usado en el csv.
 """
 function read_data_cuarentena(csv_cuarentena; delim = ';')
     data_cuarentenas = readtimearray(csv_cuarentena; delim = delim)
@@ -99,5 +99,29 @@ function calcular_frac_cuarentena(numero_dias, data_cuarentenas, df)
     for i in 1:numero_dias
         calcular_frac_cuarentena_en_t!(frac,i, data_cuarentenas, df)
     end
+    frac
+end
+
+"""
+    obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query, delim = ';')
+# Argumentos
+Calcula la fracción de personas en cuarentena para todos los datos disponibles.
+- `csv_cuarentena::String`: path al csv con la serie de tiempo correspondiente a la cuarentena por dia y comuna.
+Se espera que sea de la forma
+```
+fecha; comuna_1; comuna_2; ...
+2020-03-27; 0;1;
+```
+La fecha debe estar en formato `YYYY-MM-DD`. Los datos son binarios, indicando si la comuna se encontraba o no en cuarentena ese día.
+- `eod_db::String`: path a la base de datos EOD
+- `pobla_query::String`: path al archivo con la consulta SQL.
+- `delim = ';'`: (opcional) delimitador del `.csv` con los datos de las cuarentenas.
+# Ejemplo
+frac_cuarentena = obtener_frac_cuarentena_from_csv('CuarentenaRM.csv', 'EOD2012-Santiago.db', 'query-poblacion-clase.sql')
+"""
+function obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query, delim = ';')
+    data_cuarentenas, numero_dias = read_data_cuarentena(csv_cuarentena; delim = delim)
+    tramos_df = read_db(eod_db, pobla_query)
+    frac = calcular_frac_cuarentena(numero_dias, data_cuarentenas, tramos_df)
     frac
 end

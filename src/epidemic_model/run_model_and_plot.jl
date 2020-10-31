@@ -7,7 +7,7 @@ cd(@__DIR__)
 # cd("src") # descomentar si hay error al incluir los archivos
 
 include("MatrixP.jl")
-include("CallbackTests.jl")
+include("ReadCuarentenaData.jl")
 include("EpidemicModel.jl")
 include("PlottingModel.jl")
 
@@ -72,10 +72,13 @@ total_por_clase = total_por_clase_censo/10
 
 u0 = set_up_inicial_conditions(total_por_clase)
 
+frac = obtener_frac_cuarentena_from_csv(
+    "..\\..\\data\\CuarentenasRM.csv",
+    "..\\..\\data\\EOD2012-Santiago.db",
+    "query-poblacion-clase.sql"
+)
 
-data_cuarentenas, numero_dias = read_data_cuarentena("..\\..\\data\\CuarentenasRM.csv")
-tramos_df = read_db("..\\..\\data\\EOD2012-Santiago.db", "query-poblacion-clase.sql")
-frac = calcular_frac_cuarentena(numero_dias, data_cuarentenas, tramos_df)
+numero_dias = size(frac)[1]
 
 data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac)
 
