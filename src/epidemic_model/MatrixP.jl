@@ -169,7 +169,7 @@ function reducir_tiempo_trabajo!(P)
     hogar = 1
     trabajo = 2
     tpo_trabajo = P[:,trabajo]
-    clase_baja, clase_media, clase_alta = index_clases()
+    clase_baja, clase_media, clase_alta = index_clases() # FALTA ESTO...
     frac_reduccion = ones(18)
     frac_reduccion[clase_baja] .= 0.2
     frac_reduccion[clase_media] .= 0.5
@@ -207,4 +207,39 @@ function reducir_tiempo_transporte!(P)
     transporte = 9:12
     P[:,1] += sum(P[:, transporte], dims = 2)/2.
     P[:, transporte] /= 2.0
+end
+
+v_p100s = Dict{Int,Vector{Float64}}(1 => [0.1,0.5,0.8], 5=> [-0.1,0.4,0.6])
+
+
+
+"""
+    variation_p100!(P,v_p100s)
+# Argumentos
+- `P`: matriz de tiempos de residencia. Será modificada.
+- `v_p100s::Dict{Int, Array{Number}}`: diccinario donde `key => value` quiere decir
+    que `value` contiene un array de largo 3, de tal forma que `value[i]` corresponde
+    a la variacion de la cantidad en la columna `key`-ésima, en todos las filas
+    asociadas a la clase baja (`i=1`), clase media (`i=2`) o clase alta (`i=3`).
+"""
+function variation_p100!(P,v_p100s)
+    for (ambiente, variaciones_por_clase) in v_p100s
+        for clase in 1:3
+            filas_clase = map_class_index(clase)
+            P[filas_clase,ambiente] += variaciones_por_clase[i] .* P[filas_clase,ambiente]
+        end
+    end
+end
+
+function map_class_index(i)
+    if i == 1
+        index = clase_baja()
+    elseif i == 2
+        index = clase_media()
+    elseif i == 3
+        index = clase_alta()
+    else
+        index = []
+    end
+    index
 end
