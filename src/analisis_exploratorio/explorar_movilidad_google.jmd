@@ -107,10 +107,11 @@ Calcularemos una media móvil de 3 días de los datos.
 ```{julia; fig_ext=".svg"}
 using Statistics
 
-mov_google_mean3 = moving(mean, mov_google_corregido, 10)
+window = 7
+mov_google_movmean = moving(mean, mov_google_corregido, window)
 
-plot_comparar_movilidad(mov_google_corregido, mov_google_mean3,
-    title = "Comparación entre serie corregida y media móvil (3 días)"
+plot_comparar_movilidad(mov_google_corregido, mov_google_movmean,
+    title = "Comparación entre serie corregida y media móvil ($window días)"
 )
 ```
 # Agregar datos de cuarentenas
@@ -118,27 +119,38 @@ Agregaremos barras grises para mostrar la cantidad de personas en cuarentena.
 [] Corregir, debería ser `frac::TimeSeries`.
 ```julia
 include("..\\epidemic_model\\ReadCuarentenaData.jl")
-csv_cuarentena = "..\\..\\data\\CuarentenasRM.csv"
+csv_cuarentena = "..\\..\\data\\CuarentenasRMv2.csv"
 eod_db = "..\\..\\data\\EOD2012-Santiago.db"
 pobla_query = "..\\epidemic_model\\query-poblacion-clase.sql"
-frac, dias_cuarentena = obtener_frac_cuarentena_from_csv(
-    csv_cuarentena, eod_db, pobla_query, tramos = false
+
+frac_cuarentena, dias_cuarentena = obtener_frac_cuarentena_from_csv(
+    csv_cuarentena, eod_db, pobla_query,
+    delim = ',', tramos = false, modo = :cuarentena
 )
-numero_dias = length(frac)
+numero_dias = length(frac_cuarentena)
+csv_paso_a_paso = "..\\..\\data\\paso_a_paso_por_comunas.csv"
+frac_PaP, dias_PaP = obtener_frac_cuarentena_from_csv(
+    csv_paso_a_paso, eod_db, pobla_query, tramos = false,
+    delim = ',', modo = :PaP
+)
 ```
 Los datos de movilidad de google están disponibles desde el 2020-02-24 hasta el 2020-10-18
 ```julia; term=true
-timestamp(mov_google_mean3)[1]
-timestamp(mov_google_mean3)[end]
+timestamp(mov_google_movmean)[1]
+timestamp(mov_google_movmean)[end]
 ```
-Los datos de cuarentenas están disponibles desde el 2020-03-13 hasta el 2020-07-27 (137 días).
+Los datos de cuarentenas están disponibles desde el 2020-03-13 hasta el 2020-07-18 (128 días).
 ```julia;term=true
 dias_cuarentena[1]
 dias_cuarentena[end]
 ```
+Los datos del plan paso a paso están disponibles a partir del día 2020-07-19.
+Unimos todo en un único array.
 Vemos que hay 18 días entre ambos los datos de cuarentenas y los datos de Google.
 ```julia;term=true
-dias_cuarentena[1] - timestamp(mov_google_mean3)[1]
+dias_cuarentena[1] - timestamp(mov_google_movmean)[1]
+timestamp(mov_google_movmean)[end] - dias_cuarentena[end]
+
 ```
 
 Hacemos una función para graficar tiras grises. La intensidad del color depende
@@ -148,15 +160,55 @@ function plot_strip!(a_plot,dia::Date, frac_dia)
     vspan!(a_plot,[dia,dia+Day(1)], alpha = frac_dia, color = :black, label = :none)
 end
 
-a_plot = plot(title = "Media movil de 3 días de los datos de Google y cuarentenas")
-for dia in 1:numero_dias
-    plot_strip!(a_plot, dias_cuarentena[dia], frac[dia])
-end
-ambientes = colnames(mov_google_mean3)
-for i in 1:length(ambientes)
-    plot!(a_plot, mov_google_mean3[ambientes[i]],
-        color = i
+fechas_clave = [Date(2020,3,16), Date(2020,3,26), Date(2020,4,16),Date(2020,4,23), Date(2020,4,30), Date(2020,5,5), Date(2020,5,8), Date(2020,5,15), Date(2020,7,27)]
+
+
+function plot_fechas_clave_cuarentenas!(a_plot)
+    vline!(a_plot, fechas_clave,
+        color = :black, label = "Fechas clave"
     )
 end
-a_plot
+
+begin
+    #a_plot = plot(title = "Media movil de $window días de los datos de Google y cuarentenas")
+
+    a_plot = plot( timestamp(mov_google_movmean),
+        [zeros(21); frac_cuarentena; ones(83)],
+        color = :gray,
+        fill = (0, 1., :gray),
+        label = "Fracción personas en cuarentena",
+        grid = false
+    )
+    plot_fechas_clave_cuarentenas!(a_plot)
+
+    tx = twinx(a_plot)
+
+
+    ambientes = colnames(mov_google_movmean)
+    #for dia in 1:numero_dias
+        #plot_strip!(a_plot, dias_cuarentena[dia], frac[dia])
+    #end
+
+    for i in 1:length(ambientes)
+        plot!(tx, mov_google_movmean[ambientes[i]],
+            color = i
+        )
+    end
+    a_plot
+    #plot_fechas_clave_cuarentenas!(a_plot)
+end
+
+```
+
+Quiero ver mejor cómo se comporta la cantidad de personas en cuarenten
+```{julia; fig_ext=".svg"}
+#range = Date(2020,3,1):Dates.Month(2):Date(2020,9,1)
+
+plot(title = "Recreación")
+for i in 1:(length(fechas_clave)-1)
+    scatter!(frac_cuarentena, values(mov_google_movmean[:recreacion][fechas_clave[i:i+1]]))
+end
+plot!(xlabel = "Fracción de personas en cuarentena",
+    ylabel = "Porcentaje de variación c/r a la línea base"
+)
 ```

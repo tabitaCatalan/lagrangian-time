@@ -1,0 +1,5 @@
+.vscode
+.vs 
+*.asv
+*.mexw64
+data/valparaiso

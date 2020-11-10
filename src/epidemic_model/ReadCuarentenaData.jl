@@ -21,16 +21,19 @@ contar_dias(TS::TimeArray) = length(timestamp(TS))
 """
     read_data_cuarentena(csv_cuarentena; delim = ';')
 # Argumentos
-- `csv_cuarentena::String`: path al csv con la serie de tiempo correspondiente a la cuarentena por dia y comuna.
+- `csv_cuarentena::String`: path al csv con la serie de tiempo correspondiente a
+    la cuarentena por dia y comuna.
 # Salida
 - `data_cuarentena::TimeSeries`  (fechas en las filas, comunas en las columnas)
 - `numero_dias`: cuantos dias están considerados en los datos.
 # Ejemplo
 ```julia
-data_cuarentenas, numero_dias = read_data_cuarentena('..\\..\\data\\CuarentenasRM.csv'; delim = ';')
+data_cuarentenas, numero_dias = read_data_cuarentena('..\\..\\data\\CuarentenasRM.csv';
+    delim = ';'
+)
 ```
 """
-function read_data_cuarentena(csv_cuarentena; delim = ';')
+function read_data_cuarentena(csv_cuarentena; delim = delim)
     data_cuarentenas = readtimearray(csv_cuarentena; delim = delim)
     numero_dias = contar_dias(data_cuarentenas)
     data_cuarentenas, numero_dias
@@ -59,21 +62,65 @@ end
 
 
 """
+    procesar_PaP!(cuarentenas_en_t, modo)
+Calcula la fraccion de personas en cuarentena.
+# Argumentos
+- `cuarentenas_en_t`: array donde la posicion (dia, comuna)
+    tiene la informacion de qué tipo de cuarentena se realiza.
+- `modo`: hay dos opciones
+    - `:cuarentena`
+        No pasa nada. Suponemos que esta codificado como `0` si no hay cuarentena
+        y `1` si sí la hay.
+    - `:PaP`
+        En el modo plan paso a paso, se espera que la matriz de cuarentena
+        tenga la fase del plan en que está la comuna para cada día. Los valores
+        válidos están entre 1 y 5. La fase 1 corresponde a cuarentena, se asume
+        un 100% de personas cuarentenadas. La fase 2 corresponde a cuarentena los
+        fines de semanas, por lo que consideramos 2/7 de personas cuarentenadas
+        (solo 2 de 7 días). Desde la fase 3 en adelante consideramos 0% de personas
+        cuarentenas, aunque podría buscarse otro enfoque ya que aun hay medidas
+        en esas fases.
+# Lectura adicional
+https://www.minsal.cl/presidente-sebastian-pinera-presenta-plan-paso-a-paso/
+"""
+function procesar_PaP!(cuarentenas_en_t, modo)
+    if modo == :cuarentena
+    elseif modo == :PaP
+        # encontrar los indices de los grupos: 1,2 y 3-5
+        # 1 -> 1 = 100% gente en cuarentena. No se cambia nada.
+        # 2 -> 2/7 ≈ 29% gente en cuarentena
+        fase2 = cuarentenas_en_t .== 2
+        cuarentenas_en_t[fase2] .= 2/7
+        # 3-5 -> 0 = 0% gente en cuarentena
+        fase3 = cuarentenas_en_t .== 3
+        fase4 = cuarentenas_en_t .== 4
+        fase5 = cuarentenas_en_t .== 5
+        sin_cuarentena_indexs = max.(fase3, fase4, fase5) # se está en alguna de esas fases
+        cuarentenas_en_t[sin_cuarentena_indexs] .= 0
+    else
+        print("Ingrese un modo válido. Las opciones disponibles son :cuarentena y :PaP (paso a paso)")
+    end
+end
+
+
+"""
     calcular_pobla_en_cuarentena(tiempo, data_cuarentenas, df)
 Calcula la cantidad de personas que están en cuarentena en cierto tiempo.
 """
-function calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df)
+function calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
     cuarentenas_en_t = values(data_cuarentenas[t_floor])'
-    comunas_sin_cuarentena = [34, 42, 44, 46, 47, 50]
-    f = i -> in(i, comunas_sin_cuarentena)
-    comunas_con_cuarentena = .!f.(1:52)
+    #comunas_sin_cuarentena = [34, 42, 44, 46, 47, 50]
+    #comunas_sin_cuarentena = []
+    #f = i -> in(i, comunas_sin_cuarentena)
+    #comunas_con_cuarentena = .!f.(1:52)
+    comunas_con_cuarentena = 1:52
     pobla_por_comuna = df.poblacion_total
     pobla_en_cuarentena = similar(pobla_por_comuna)
-    pobla_en_cuarentena[comunas_sin_cuarentena] .= 0
-    pobla_en_cuarentena[comunas_con_cuarentena] = pobla_por_comuna[comunas_con_cuarentena] .* cuarentenas_en_t
+    #pobla_en_cuarentena[comunas_sin_cuarentena] .= 0
+    procesar_PaP!(cuarentenas_en_t, modo)
+    pobla_en_cuarentena[comunas_con_cuarentena] = floor.(pobla_por_comuna[comunas_con_cuarentena] .* cuarentenas_en_t)
     pobla_en_cuarentena
 end
-
 
 """
     calcular_frac_cuarentena_en_t!(frac, tiempo)
@@ -92,12 +139,13 @@ Se usan los siguientes datos:
 │ 3             │ 1585260         │ 0.22287400419075  │
 └───────────────┴─────────────────┴───────────────────┘
 """
-function calcular_frac_cuarentena_en_t_por_tramo!(frac, tiempo, data_cuarentenas, df)
+function calcular_frac_cuarentena_en_t_por_tramo!(frac, tiempo, data_cuarentenas, df, modo)
     t_floor = floor(Int, tiempo)
-    pobla_en_cuarentena = calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df)
-    frac_t1 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 1])/2456390
-    frac_t2 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 2])/3071158
-    frac_t3 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 3])/1585260
+    pobla_tramo = (2456390, 3071158, 1585260)
+    pobla_en_cuarentena = calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
+    frac_t1 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 1])/pobla_tramo[1]
+    frac_t2 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 2])/pobla_tramo[2]
+    frac_t3 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 3])/pobla_tramo[3]
     frac[t_floor,1] = frac_t1
     frac[t_floor,2] = frac_t2
     frac[t_floor,3] = frac_t3
@@ -107,15 +155,15 @@ end
     calcular_frac_cuarentena(data_cuarentenas, df)
 Devuelve un array con la cantidad de personas en cuarentena cada día.
 """
-function calcular_frac_cuarentena(data_cuarentenas, df)
+function calcular_frac_cuarentena(data_cuarentenas, df, modo)
     numero_dias = contar_dias(data_cuarentenas)
-    total_pobla_cuarentena_en_t(dia) = sum(calcular_pobla_en_cuarentena_en_t(dia, data_cuarentenas, df))
-    pobla_en_cuarentena = total_pobla_cuarentena_en_t.(1:numero_dias)
+    pobla_en_cuarentena = zeros(numero_dias)
+    for dia in 1:numero_dias
+        pobla_en_cuarentena[dia] = sum(calcular_pobla_en_cuarentena_en_t(dia, data_cuarentenas, df, modo))
+    end
     frac = pobla_en_cuarentena ./ sum(df.poblacion_total)
     frac
 end
-
-
 
 """
     calcular_frac_cuarentena(df, numero_dias)
@@ -124,17 +172,17 @@ end
 - `data_cuarentenas::TimeSeries`
 - `df::DataFrame`
 """
-function calcular_frac_cuarentena_por_tramo(data_cuarentenas, df)
+function calcular_frac_cuarentena_por_tramo(data_cuarentenas, df, modo)
     numero_dias = contar_dias(data_cuarentenas)
     frac = zeros(numero_dias, 3)
     for i in 1:numero_dias
-        calcular_frac_cuarentena_en_t_por_tramo!(frac,i, data_cuarentenas, df)
+        calcular_frac_cuarentena_en_t_por_tramo!(frac,i, data_cuarentenas, df, modo)
     end
     frac
 end
 
 """
-    obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query, delim = ';')
+    obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query, delim = ';', mode)
 # Argumentos
 Calcula la fracción de personas en cuarentena para todos los dias disponibles en el csv.
 - `csv_cuarentena::String`: path al csv con la serie de tiempo correspondiente a la cuarentena por dia y comuna.
@@ -151,13 +199,13 @@ La fecha debe estar en formato `YYYY-MM-DD`. Los datos son binarios, indicando s
 # Ejemplo
 frac_cuarentena = obtener_frac_cuarentena_from_csv('CuarentenaRM.csv', 'EOD2012-Santiago.db', 'query-poblacion-clase.sql')
 """
-function obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query; delim = ';', tramos = true)
+function obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query; delim = ',', tramos = true, modo)
     data_cuarentenas, numero_dias = read_data_cuarentena(csv_cuarentena; delim = delim)
     tramos_df = read_db(eod_db, pobla_query)
     if tramos
-        frac = calcular_frac_cuarentena_por_tramo(data_cuarentenas, tramos_df)
+        frac = calcular_frac_cuarentena_por_tramo(data_cuarentenas, tramos_df, modo)
     else
-        frac = calcular_frac_cuarentena(data_cuarentenas, tramos_df)
+        frac = calcular_frac_cuarentena(data_cuarentenas, tramos_df, modo)
     end
     frac, timestamp(data_cuarentenas)
 end
