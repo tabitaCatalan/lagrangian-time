@@ -146,6 +146,11 @@ dias_cuarentena[end]
 ```
 Los datos del plan paso a paso están disponibles a partir del día 2020-07-19.
 Unimos todo en un único array.
+```julia
+frac_outbreak = [frac_cuarentena; frac_PaP]
+dias_outbreak = [dias_cuarentena; dias_PaP]
+```
+
 Vemos que hay 18 días entre ambos los datos de cuarentenas y los datos de Google.
 ```julia;term=true
 dias_cuarentena[1] - timestamp(mov_google_movmean)[1]
@@ -159,8 +164,9 @@ de la fracción de personas en cuarentena ese día.
 function plot_strip!(a_plot,dia::Date, frac_dia)
     vspan!(a_plot,[dia,dia+Day(1)], alpha = frac_dia, color = :black, label = :none)
 end
-
-fechas_clave = [Date(2020,3,16), Date(2020,3,26), Date(2020,4,16),Date(2020,4,23), Date(2020,4,30), Date(2020,5,5), Date(2020,5,8), Date(2020,5,15), Date(2020,7,27)]
+#
+#fechas_clave = [Date(2020,3,16), Date(2020,3,26), Date(2020,4,16),Date(2020,4,23), Date(2020,4,30), Date(2020,5,5), Date(2020,5,8), Date(2020,5,15), Date(2020,7,27), 2020-10-18]
+fechas_clave = [Date(2020,3,16), Date(2020,3,26), Date(2020,5,8), Date(2020,5,15), Date(2020,7,27), Date(2020,10,18)]
 
 
 function plot_fechas_clave_cuarentenas!(a_plot)
@@ -173,7 +179,7 @@ begin
     #a_plot = plot(title = "Media movil de $window días de los datos de Google y cuarentenas")
 
     a_plot = plot( timestamp(mov_google_movmean),
-        [zeros(21); frac_cuarentena; ones(83)],
+        [zeros(21); frac_outbreak[1:220]],
         color = :gray,
         fill = (0, 1., :gray),
         label = "Fracción personas en cuarentena",
@@ -198,6 +204,79 @@ begin
     #plot_fechas_clave_cuarentenas!(a_plot)
 end
 
+```
+
+Ahora quiero estudiar el comportamiento en ciertas zonas
+```julia;term=true
+fechas_clave[2:end]-fechas_clave[1:end-1]
+```
+En base a eso definimos 5 bloques: cada uno limitado por dos fechas claves.
+
+```julia
+function calcular_bloque(i)
+    timestamp(mov_google_movmean[fechas_clave[i]:Dates.Day(1):fechas_clave[i+1]])
+end
+
+bloq1 = calcular_bloque(1)
+bloq2 = calcular_bloque(2)
+bloq3 = calcular_bloque(3)
+bloq4 = calcular_bloque(4)
+bloq5 = calcular_bloque(5);
+```
+
+Necesito una función para calcular una aproximación lineal.
+```{julia; fig_ext=".svg"}
+function get_xy(bloq::Vector{Date}, ambiente)
+    y = values(mov_google_movmean[bloq][ambiente])
+    x = 1:length(bloq)
+    x,y
+end
+"""
+Devuelve coeficientes a,b de tal forma que a*x + b aproxima a y.
+"""
+function linear_regression(x,y)
+    n = length(x)
+    M = reshape([ones(n); x], (n,2))
+    v = M\y
+    v[2], v[1]
+end
+
+bloques = [bloq1, bloq2, bloq3, bloq4, bloq5]
+K = 5
+A = zeros(K)
+B = zeros(K)
+X = []
+for i in 1:K
+    x, y = get_xy(bloques[i], :trabajo)
+    a, b = linear_regression(x,y)
+    A[i] = a
+    B[i] = b
+    push!(X,x)
+end
+
+begin
+    a_plot2 = plot(mov_google_movmean[:trabajo])
+    plot_fechas_clave_cuarentenas!(a_plot2)
+    for i in 1:K
+        plot!(bloques[i], A[i]*X[i] .+ B[i])
+    end
+    a_plot2
+end
+```
+
+Definimos ahora una serie de tiempo para poder comparar
+```julia
+time_stamp_linear = bloq1[1]:Dates.Day(1):bloq5[end]
+LR = TimeArray(time_stamp_linear,
+    data_LR,
+    colnames(mov_google_movmean)
+)
+data_LR = zeros(length(time_stamp_linear),6)
+for i in 1:K
+    for ambiente in ambientes
+        data_LR[bloques[i][1]:bloques[i][end]][ambiente] = A[i]*X[i] .+ B[i]
+    end
+end
 ```
 
 Quiero ver mejor cómo se comporta la cantidad de personas en cuarenten
