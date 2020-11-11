@@ -76,13 +76,12 @@ mov_google_corregido = (mov_google .- p) ./(1 .+ p./100);
 Para comparar las dos series creamos la función `plot_comparar_movilidad`.
 ```{julia; fig_ext=".svg"}
 """
-    plot_comparar_movilidad(ts_mov1, ts_mov2; title = "")
+    plot_comparar_movilidad!(ts_mov1, ts_mov2; title = "")
 Grafica dos series de tiempo de los datos de movilidad de Google,
 la primera de ellas con mayor transparencia.
 """
-function plot_comparar_movilidad(ts_mov1, ts_mov2; title = "")
+function plot_comparar_movilidad!(a_plot, ts_mov1, ts_mov2)
     ambientes = colnames(ts_mov1)
-    a_plot = plot(title = title)
     for i in 1:length(ambientes)
         plot!(a_plot, ts_mov1[ambientes[i]],
             alpha = 0.2,
@@ -95,9 +94,9 @@ function plot_comparar_movilidad(ts_mov1, ts_mov2; title = "")
     end
     a_plot
 end
-plot_comparar_movilidad(mov_google, mov_google_corregido,
-    title = "Comparación entre serie original y corregida"
-)
+ap = plot(title = "Comparación entre serie original y corregida")
+plot_comparar_movilidad!(ap, mov_google, mov_google_corregido)
+ap
 
 ```
 El color más intenso corresponde a los datos corregidos.
@@ -110,9 +109,9 @@ using Statistics
 window = 7
 mov_google_movmean = moving(mean, mov_google_corregido, window)
 
-plot_comparar_movilidad(mov_google_corregido, mov_google_movmean,
-    title = "Comparación entre serie corregida y media móvil ($window días)"
-)
+ap = plot(title = "Comparación entre serie corregida y media móvil ($window días)")
+plot_comparar_movilidad!(ap, mov_google_corregido, mov_google_movmean)
+ap
 ```
 # Agregar datos de cuarentenas
 Agregaremos barras grises para mostrar la cantidad de personas en cuarentena.
@@ -132,7 +131,7 @@ csv_paso_a_paso = "..\\..\\data\\paso_a_paso_por_comunas.csv"
 frac_PaP, dias_PaP = obtener_frac_cuarentena_from_csv(
     csv_paso_a_paso, eod_db, pobla_query, tramos = false,
     delim = ',', modo = :PaP
-)
+);
 ```
 Los datos de movilidad de google están disponibles desde el 2020-02-24 hasta el 2020-10-18
 ```julia; term=true
@@ -148,7 +147,7 @@ Los datos del plan paso a paso están disponibles a partir del día 2020-07-19.
 Unimos todo en un único array.
 ```julia
 frac_outbreak = [frac_cuarentena; frac_PaP]
-dias_outbreak = [dias_cuarentena; dias_PaP]
+dias_outbreak = [dias_cuarentena; dias_PaP];
 ```
 
 Vemos que hay 18 días entre ambos los datos de cuarentenas y los datos de Google.
@@ -158,26 +157,32 @@ timestamp(mov_google_movmean)[end] - dias_cuarentena[end]
 
 ```
 
-Hacemos una función para graficar tiras grises. La intensidad del color depende
+
+Hacemos una sfunción para graficar tiras grises. La intensidad del color depende
 de la fracción de personas en cuarentena ese día.
-```{julia; fig_ext=".svg"}
+```julia
 function plot_strip!(a_plot,dia::Date, frac_dia)
     vspan!(a_plot,[dia,dia+Day(1)], alpha = frac_dia, color = :black, label = :none)
 end
-#
+```
+# Fechas Clave
+Mostramos algunas fechas que fueron significativas en cuanto a la cantidad de
+personas que fueron agregadas o quitadas a la cuarentenas, o porque marcan el
+inicio de algo nuevo, etc.
+
+```{julia; fig_ext=".svg"}}
 #fechas_clave = [Date(2020,3,16), Date(2020,3,26), Date(2020,4,16),Date(2020,4,23), Date(2020,4,30), Date(2020,5,5), Date(2020,5,8), Date(2020,5,15), Date(2020,7,27), 2020-10-18]
 fechas_clave = [Date(2020,3,16), Date(2020,3,26), Date(2020,5,8), Date(2020,5,15), Date(2020,7,27), Date(2020,10,18)]
 
 
-function plot_fechas_clave_cuarentenas!(a_plot)
+function plot_fechas_clave_cuarentenas!(a_plot; label = "Fechas clave", color = :black)
     vline!(a_plot, fechas_clave,
-        color = :black, label = "Fechas clave"
+        color = color, label = label
     )
 end
 
 begin
-    #a_plot = plot(title = "Media movil de $window días de los datos de Google y cuarentenas")
-
+    a_plot = plot(title = "Fechas clave")
     a_plot = plot( timestamp(mov_google_movmean),
         [zeros(21); frac_outbreak[1:220]],
         color = :gray,
@@ -186,14 +191,25 @@ begin
         grid = false
     )
     plot_fechas_clave_cuarentenas!(a_plot)
+    a_plot
+end
+```
+Graficamos los datos de Google con las cuarentenas de fondo.
+```{julia; fig_ext=".svg"}
+begin
+    #a_plot = plot(title = "Media movil de $window días de los datos de Google y cuarentenas")
+    a_plot = plot( timestamp(mov_google_movmean),
+        [zeros(21); frac_outbreak[1:220]],
+        color = :gray,
+        fill = (0, 1., :gray),
+        label = :none,
+        grid = false
+    )
+    plot_fechas_clave_cuarentenas!(a_plot, label = :none)
 
     tx = twinx(a_plot)
 
-
     ambientes = colnames(mov_google_movmean)
-    #for dia in 1:numero_dias
-        #plot_strip!(a_plot, dias_cuarentena[dia], frac[dia])
-    #end
 
     for i in 1:length(ambientes)
         plot!(tx, mov_google_movmean[ambientes[i]],
@@ -201,11 +217,10 @@ begin
         )
     end
     a_plot
-    #plot_fechas_clave_cuarentenas!(a_plot)
 end
-
 ```
 
+# Parametrizar los datos
 Ahora quiero estudiar el comportamiento en ciertas zonas
 ```julia;term=true
 fechas_clave[2:end]-fechas_clave[1:end-1]
@@ -225,7 +240,7 @@ bloq5 = calcular_bloque(5);
 ```
 
 Necesito una función para calcular una aproximación lineal.
-```{julia; fig_ext=".svg"}
+```julia
 function get_xy(bloq::Vector{Date}, ambiente)
     y = values(mov_google_movmean[bloq][ambiente])
     x = 1:length(bloq)
@@ -243,40 +258,99 @@ end
 
 bloques = [bloq1, bloq2, bloq3, bloq4, bloq5]
 K = 5
-A = zeros(K)
-B = zeros(K)
-X = []
-for i in 1:K
-    x, y = get_xy(bloques[i], :trabajo)
-    a, b = linear_regression(x,y)
-    A[i] = a
-    B[i] = b
-    push!(X,x)
-end
 
+function calcular_aprox(ambiente, K)
+    A = zeros(K)
+    B = zeros(K)
+    X = []
+    for i in 1:K
+        x, y = get_xy(bloques[i], ambiente)
+        a, b = linear_regression(x,y)
+        A[i] = a
+        B[i] = b
+        push!(X,x)
+    end
+    X, A, B
+end
+```
+Esto nos permite calcular un aproximación lineal por trozos.
+```{julia; fig_ext=".svg"}
+X, A, B = calcular_aprox(:trabajo, K)
 begin
-    a_plot2 = plot(mov_google_movmean[:trabajo])
+    a_plot2 = plot(mov_google_movmean[:trabajo], alpha = 0.3)
     plot_fechas_clave_cuarentenas!(a_plot2)
     for i in 1:K
-        plot!(bloques[i], A[i]*X[i] .+ B[i])
+        plot!(bloques[i], A[i]*X[i] .+ B[i], color = 1, label =:none)
     end
     a_plot2
 end
-```
 
+begin
+    a_plot = plot(title = "Aproximación lineal por trozos")
+    plot!( timestamp(mov_google_movmean),
+        [zeros(21); frac_outbreak[1:220]],
+        color = :black,
+        fill = (0, 1., :black),
+        label = :none,
+        grid = false
+    )
+    plot_fechas_clave_cuarentenas!(a_plot, label = :none, color = :red)
+
+    tx = twinx(a_plot)
+    plot!(tx, mov_google_movmean[:trabajo], alpha = 0.3)
+    plot!(tx,bloques[1], A[1]*X[1] .+ B[1], color = 1, label ="aprox")
+    for i in 2:K
+        plot!(tx,bloques[i], A[i]*X[i] .+ B[i], color = 1, label =:none)
+    end
+    a_plot
+end
+```
+weave(filename, out_path = :pwd, doctype = "md2html")
 Definimos ahora una serie de tiempo para poder comparar
 ```julia
 time_stamp_linear = bloq1[1]:Dates.Day(1):bloq5[end]
+length(time_stamp_linear)
+
+data_LR = zeros(length(time_stamp_linear),6)
+
+largos = length.(bloques)
+largos_acu = [1,largos[1], sum(largos[1:2])-1, sum(largos[1:3])-2, sum(largos[1:4])-3, sum(largos[1:5])-4]
+
+for j in 1:length(ambientes)
+    for i in 1:5
+        X, A, B = calcular_aprox(ambientes[j], K)
+        data_LR[largos_acu[i]:largos_acu[i+1], j] = A[i]*X[i] .+ B[i]
+    end
+end
+
 LR = TimeArray(time_stamp_linear,
     data_LR,
     colnames(mov_google_movmean)
-)
-data_LR = zeros(length(time_stamp_linear),6)
-for i in 1:K
-    for ambiente in ambientes
-        data_LR[bloques[i][1]:bloques[i][end]][ambiente] = A[i]*X[i] .+ B[i]
-    end
+);
+```
+Graficamos la serie de tiempo aproximada
+```{julia; fig_ext=".svg"}
+begin
+    a_plot = plot(title = "Aproximación lineal por trozos")
+    plot!( timestamp(mov_google_movmean),
+        [zeros(21); frac_outbreak[1:220]],
+        color = :black,
+        fill = (0, 1., :black),
+        label = :none,
+        grid = false
+    )
+    plot_fechas_clave_cuarentenas!(a_plot, label = :none, color = :red)
+
+    tx = twinx(a_plot)
+
+    plot_comparar_movilidad!(tx, mov_google_movmean , LR)
+
+    a_plot
+
 end
+using CSV
+CSV.write("LinearReg.csv", LR)
+
 ```
 
 Quiero ver mejor cómo se comporta la cantidad de personas en cuarenten
