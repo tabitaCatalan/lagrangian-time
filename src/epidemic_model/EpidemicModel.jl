@@ -10,17 +10,18 @@ using StaticArrays
 
 """
     MyDataArray
-Esta estructura está pensada para ser usada en el modelo de **EpidemicModel.jl**. Surge de la necesidad de tener acceso a variables globales eficientes. Puede usarse en el solver de **DifferentialEquations.jl**.
+Esta estructura está pensada para ser usada en el modelo de **EpidemicModel.jl**.
+Surge de la necesidad de tener acceso a variables globales eficientes. Puede
+usarse en el solver de **DifferentialEquations.jl**.
 # Campos
 - `x`: Estado actual
-- `P_normal`: matriz de tiempos de residencia normal
-    (sin medidas preventivas)
-- `P_cuarentena`: matriz de tiempos de residencia en
-    cuarentena. Del mismo tamaño que `P_normal`.
+- `P_normal`: matriz de tiempos de residencia normal (sin medidas preventivas)
+- `P_cuarentena`: matriz de tiempos de residencia en cuarentena. Del mismo
+    tamaño que `P_normal`.
 - `frac_pobla_cuarentena`: matriz de fraccion de personas
-    en cuarentena dependiendo del tiempo. Es de tamño `numero_dias`x3. En la coordenada `i,j` contiene la
-    fracción de personas de la clase social `j` que están
-    en cuarentena el día `i`.
+    en cuarentena dependiendo del tiempo. Es de tamño `numero_dias`x3. En la
+    coordenada `i,j` contiene la fracción de personas de la clase social `j` que
+    están en cuarentena el día `i`.
 """
 struct MyDataArray{T} <: DEDataArray{T,1}
     x::ComponentVector{T}
@@ -29,10 +30,80 @@ struct MyDataArray{T} <: DEDataArray{T,1}
     frac_pobla_cuarentena::Array{T,2}
 end
 
+"""
+    LambdaParam
+Esta estructura contiene los parametros para calcular la tasa de contagio que
+deben ser ajustados.
+# Campos
+- `alpha`: parámetro de control, relacionado al distanciamiento social y la
+    fracción de personas en cuarentena. Debería ser un valor en [0,1].
+- `beta`: parámetro de ajuste de los riesgos relativos. Se tendrá un vector fijo
+    con valores de riesgo entre 0 y 1 para cada uno de los ambientes. Sin
+    embargo, para ajustar el modelo es necesario ponderar esos valores por `beta`.
+- `p_E`: probabilidad de que un susceptible sea contagiado por un expuesto.
+- `p_I`: probabilidad de que un susceptible sea contagiado por un sintomático.
+- `p_Im`: probabilidad de que un susceptible sea contagiado por un asintomático.
+"""
+struct LambdaParam{T}
+    alpha::T
+    beta::T
+    p_E::T
+    p_I::T
+    p_Im::T
+end
+
+"""
+    ModelParam
+Esta estructura contiene los parámetros del modelo SEIIRHHD que deben ajustarse.
+# Campos
+## Tasas de transición
+Todas las tasas están medidas en 1/día. Eso quiere decir que si la tasa con
+que las personas en una etapa A de la enfermedad pasan a una etapa B es γ,
+entonces en promedio una persona tarda 1/γ días en pasar de la etapa A a la
+etapa B. Se utilizan valores de γ de tal forma que 1/γ esté entre 1 y 14 días.
+- `gamma_e`: tasa de salida del estado E
+- `gamma_i`: tasa de salida del estado I
+- `gamma_im`: tasa de salida del estado Iᵐ
+- `gamma_h`: tasa de salida del estado H
+- `gamma_hc`: tasa de salida del estado Hᶜ
+## Fracciones
+Las fracciones permiten bifurcar a la población que sale de un estado en dos
+posibles estados. Toman valores en [0,1].
+- `phi_ei`: fracción de personas que al salir del estado E (expuestos) pasan a
+    ser infectados sintomáticos (estado I). La fracción complementaria
+    `(1 - phi_ei)` pasará al estado Iᵐ (infectados asintomáticos)
+- `phi_ir`: fracción de personas que al salir del estado I (infectados) se
+    recuperan, pasando al estado R. La fracción complementaria `(1 - phi_ir)` se
+    enferma lo suficiente como para ser hospitalizada (estado H).
+- `phi_hr`: fracción de personas que estando hospitalizadas (estado H) logran
+    recuperarse (estado R). La fracción complementaria `(1 - phi_hr)` empeora,
+    pasando a la UCI (Unidad de Cuidados Intensivos) (estado Hᶜ).
+- `phi_d`: fracción de personas críticas (estado Hᶜ) que fallecen (estado D). La
+    fracción complementaria logra recuperarse y pasa a estar hospitalizado
+    (estado H), pudiendo eventualmente volver a empeorar.
+- `lambda_param::LambdaParam`: parámetros para la tasa de contagio. Ver la
+    descripción de `LambdaParam` para más detalles.
+"""
+struct ModelParam{T}
+    gamma_e::T
+    gamma_i::T
+    gamma_im::T
+    gamma_h::T
+    gamma_hc::T
+    phi_ei::T
+    phi_ir::T
+    phi_hr::T
+    phi_d::T
+    # podría añadir restricciones de integridad como que phi ∈ [0,1]
+    # falta un parametro para el lambda
+    lambda_param::LambdaParam{T}
+end
+
 
 """
     index_clases()
-# Devuelve los indices asociados a las distintas clases socioeconómicas en la matriz `P`.
+# Devuelve los indices asociados a las distintas clases socioeconómicas en la
+matriz `P`.
 # Resultados
 - `clase_baja::Array`
 - `clase_media::Array`
@@ -101,22 +172,16 @@ function matrix_ponderation!(P, P_normal, P_cuarentena, frac_cuarentena_por_clas
 end
 
 """
-    seiir!(du,u,p,t)
-Modelo epidemiológico tipo SEIIR
+    seiirhhd!(du,u,p,t)
+Modelo epidemiológico tipo SEIIRHHD
 # Arguments
-- `du`:
-- `u`:
-- `p`: tupla que contiene los sgtes parámetros
-  - `β`: vector de riesgos por ambiente
-  - `ν`: vector, tiene que ver con el tiempo de incubacion...
-  - `φ`: fraccion de asintomaticos
-  - `γ`: tasa de recuperacion asintomaticos
-  - `γₘ`: tasa de recuperacion sintomaticos
-  - `η`: tasa de muerte
+- `du::MyDataArray{Float64}`:
+- `u::MyDataArray{Float64}`
+- `p::ModelParam`
 - `t`:
 """
-function seiir!(du::MyDataArray{Float64},u::MyDataArray{Float64},p,t)
-    αₑ, αᵢₘ, β, ν, φ, γ, γₘ = p
+function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p,t)
+    αₑ, αᵢₘ, β, γₑ, φₑᵢ, γᵢ, γᵢₘ, φᵢᵣ, φₕᵣ, γₕ, φ_d, γₕ_c = p
     # Calcular psrametros a tiempo t
     P = similar(u.P_normal)
     matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t)+1, :])
@@ -124,10 +189,13 @@ function seiir!(du::MyDataArray{Float64},u::MyDataArray{Float64},p,t)
     calcular_lambda!(λ, αₑ, αᵢₘ, β, P, u.x.S, u.x.E, u.x.I, u.x.Im, u.x.R)
     # Calcular derivada
     du.x.S  = -λ .* u.x.S
-    du.x.E  = λ .* u.x.S - ν * u.x.E
-    du.x.I  = φ * ν * u.x.E - γ * u.x.I
-    du.x.Im = (1.0 - φ) * ν * u.x.E - γₘ * u.x.Im
-    du.x.R  = γₘ * u.x.Im + γ * u.x.I
+    du.x.E  = λ .* u.x.S - γₑ * u.x.E
+    du.x.I  = φₑᵢ * γₑ * u.x.E - γᵢ * u.x.I
+    du.x.Im = (1.0 - φₑᵢ) * γₑ * u.x.E - γᵢₘ * u.x.Im
+    du.x.R  = γᵢₘ * u.x.Im + φᵢᵣ * γᵢ * u.x.I + φₕᵣ * γₕ * u.x.H
+    du.x.H = (1.0 - φᵢᵣ) * γᵢ * u.x.I + (1.0 - φ_d) * γₕ_c * u.x.Hc - γₕ * u.x.H
+    du.x.Hc = (1.0 - φₕᵣ) * γₕ * H - γₕ_c + u.x.Hc
+    du.x.D = φ_d * γₕ_c * u.x.Hc
 end;
 
 function calcular_lambda!(λ, αₑ, αᵢₘ, β, P, S, E, I, Iᵐ, R)
@@ -155,19 +223,7 @@ function seiir_Pt!(du,u::ComponentArray,p,t)
     du.R  = γₘ .*u.Im + γ.*u.I
 end
 
-function seiir_beta_t!(du,u::ComponentArray,p,t)
-    α₁,α₂, β₁, β₂, ν, φ, γ, γₘ, τ, P = p
-    PᵗᵢI = zeros(size(P)[2])
-    PᵗᵢI[1] = sum(u.I)
-    β = ((β₂-β₁)/π)*atan((t-τ)) + (β₁+β₂)/2
-    λ = Array{Float64, 1}(undef, size(P_normal)[1])
-    calcular_lambda!(λ, α₁, α₂, β, P, u.S, u.E, u.I, u.Im, u.R)
-    du.S  = -λ.*u.S
-    du.E  = λ.*u.S - ν.*u.E
-    du.I  = φ*ν.*u.E - γ.*u.I
-    du.Im = (1.0 - φ).*ν.*u.E - γₘ .*u.Im
-    du.R  = γₘ .*u.Im + γ.*u.I
-end
+
 """
     set_up_inicial_conditions(total_por_clase)
 Crea un vector por componentes con las condiciones iniciales.
