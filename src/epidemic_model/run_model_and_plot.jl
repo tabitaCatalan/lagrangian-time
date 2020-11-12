@@ -11,21 +11,21 @@ include("ReadCuarentenaData.jl")
 include("EpidemicModel.jl")
 include("PlottingModel.jl")
 
+begin
+    P_normal, total_por_clase, nombre_ambientes, nombre_clases = read_matlab_data("..\\..\\results\\Pdata.mat")
+    suma_uno_por_fila!(P_normal)
 
-P_normal, total_por_clase, nombre_ambientes, nombre_clases = read_matlab_data("..\\..\\results\\Pdata.mat")
-suma_uno_por_fila!(P_normal)
+    δ = calcular_delta(P_normal)
 
-δ = calcular_delta(P_normal)
+    P_cuarentena = copy(P_normal)
+    aplicar_cuarentena!(P_cuarentena)
 
-P_cuarentena = copy(P_normal)
-aplicar_cuarentena!(P_cuarentena)
+    P_con_clases = copy(P_normal)
+    teletrabajo!(P_con_clases, δ)
 
-P_con_clases = copy(P_normal)
-teletrabajo!(P_con_clases, δ)
-
-P_trabajo_normal = copy(P_normal)
-cerrar_colegios!(P_trabajo_normal, δ)
-
+    P_trabajo_normal = copy(P_normal)
+    cerrar_colegios!(P_trabajo_normal, δ)
+end
 
 joven, adulto, mayor = index_edad()
 hombre, mujer = index_sexo()
@@ -48,24 +48,9 @@ rango_ips   rango_edad  n_hombres   n_mujeres
 3	        3	        79823   	128125
 """
 total_por_clase_censo = [
-    354167,
-    342032,
-    629593,
-    602701,
-    273074,
-    264804,
-    500720,
-    509142,
-    897487,
-    948986,
-    492673,
-    530052,
-    92717,
-    124998,
-    142013,
-    199701,
-    79823,
-    128125
+    354167, 342032, 629593, 602701, 273074, 264804,
+    500720, 509142, 897487, 948986, 492673, 530052,
+    92717, 124998, 142013, 199701, 79823, 128125
 ]
 
 total_por_clase = total_por_clase_censo/10
@@ -73,9 +58,10 @@ total_por_clase = total_por_clase_censo/10
 u0 = set_up_inicial_conditions(total_por_clase)
 
 frac, = obtener_frac_cuarentena_from_csv(
-    "..\\..\\data\\CuarentenasRM.csv",
+    "..\\..\\data\\CuarentenasRMv2.csv",
     "..\\..\\data\\EOD2012-Santiago.db",
-    "query-poblacion-clase.sql"
+    "query-poblacion-clase.sql",
+    modo  =:cuarentena
 )
 
 numero_dias = size(frac)[1]
@@ -83,14 +69,21 @@ numero_dias = size(frac)[1]
 data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac)
 
 #αᵢₘ = 0.15; αₑ = aᵢₘ/2
-αᵢₘ = 0.4; αₑ = αᵢₘ/2; β = 3.; γₑ = 0.14; φ = 0.1; β₂ = 3.
+γₑ = 0.14; φ = 0.1;
 dias = 10
 γᵢ = 1/dias; γᵢₘ = 1/dias;
 
 tspan = (0.0,120.0)
 τ = 100. # tiempo de implementar medidas
 
+pᵢₘ = 0.4; pₑ = pᵢₘ/2; β = 3.;
+lambda_param = LambdaParam(1.0, β, pₑ, 1.0, pᵢₘ)
 
+dias = 10
+γₑ = 0.14; γᵢ = 1/dias; γᵢₘ = 1/dias;
+γₕ = 1/7; γₕ_c = 0.5;
+φₑᵢ = 0.1; φᵢᵣ = 0.9; φₕᵣ = 0.6; φ_d = 0.9;
+p = ModelParam(γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, lambda_param)
 s,e,im,i,r = index_estados(n_clases)
 
 p1 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ)

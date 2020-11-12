@@ -180,13 +180,16 @@ Modelo epidemiológico tipo SEIIRHHD
 - `p::ModelParam`
 - `t`:
 """
-function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p,t)
-    αₑ, αᵢₘ, β, γₑ, φₑᵢ, γᵢ, γᵢₘ, φᵢᵣ, φₕᵣ, γₕ, φ_d, γₕ_c = p
-    # Calcular psrametros a tiempo t
+function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p::ModelParam{Float64},t)
+    # Extraer parametros
+    γₑ = p.gamma_e; γᵢ = p.gamma_i; γᵢₘ = p.gamma_im
+    γₕ = p.gamma_h; γₕ_c = p.gamma_hc
+    φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d
+    # Calcular parametros a tiempo t
     P = similar(u.P_normal)
     matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t)+1, :])
     λ = Array{Float64, 1}(undef, size(u.P_normal)[1])
-    calcular_lambda!(λ, αₑ, αᵢₘ, β, P, u.x.S, u.x.E, u.x.I, u.x.Im, u.x.R)
+    calcular_lambda!(λ, p.lambda_param, P, u)
     # Calcular derivada
     du.x.S  = -λ .* u.x.S
     du.x.E  = λ .* u.x.S - γₑ * u.x.E
@@ -194,14 +197,38 @@ function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p,t)
     du.x.Im = (1.0 - φₑᵢ) * γₑ * u.x.E - γᵢₘ * u.x.Im
     du.x.R  = γᵢₘ * u.x.Im + φᵢᵣ * γᵢ * u.x.I + φₕᵣ * γₕ * u.x.H
     du.x.H = (1.0 - φᵢᵣ) * γᵢ * u.x.I + (1.0 - φ_d) * γₕ_c * u.x.Hc - γₕ * u.x.H
-    du.x.Hc = (1.0 - φₕᵣ) * γₕ * H - γₕ_c + u.x.Hc
+    du.x.Hc = (1.0 - φₕᵣ) * γₕ * u.x.H - φ_d * γₕ_c * u.x.Hc
     du.x.D = φ_d * γₕ_c * u.x.Hc
 end;
 
-function calcular_lambda!(λ, αₑ, αᵢₘ, β, P, S, E, I, Iᵐ, R)
+"""
+    calcular_lambda!(λ, lambda_param::LambdaParam, P, u::MyDataArray)
+Calcula la tasa de contagio (la sobreescribe en la variable λ)
+``
+ λ_i(t) = Σ_{j=1}^m β_{j}p^S_{ij}
+\\left(
+p_E
+\\frac{ Σ_{k=1}^{n} p^E_{kj}E_k}{Σ_{k=1}^{n}p^E_{kj}N_k}
++ p_{I}
+\\frac{Σ_{k=1}^{n} p^I_{ kj}I_k }{Σ_{k=1}^{n}p^I_{kj}N_k}
++ p_{I^m}
+\\frac{Σ_{k=1}^{n}p^{I^m}{kj}I^m_k}{Σ_{k=1}^{n}p^{I^m}_{kj}N_k}
+ \\right)
+``
+# Argumentos
+- `lambda::Vector`: Su largo debe coincidir con el numero de filas de P
+- `lambda_param::LambdaParam`: parámetros para calcular la tasa de contagio. Ver
+    la descripción de `LambdaParam` para más detalles.
+- `P`: matrix de tiempos de residencia.
+- `u:MyDataArray`: estado actual del sistema.
+"""
+function calcular_lambda!(λ, lambda_param::LambdaParam{Float64}, P, u::MyDataArray{Float64})
+    α = p.lambda_param.alpha; β = p.lambda_param.beta .* get_riesgos()
+    pₑ = lambda_param.p_E; pᵢ = lambda_param.p_I; pᵢₘ = lambda_param.p_Im
+    S = u.x.S; E = u.x.E; I = u.x.I; Iᵐ = u.x.Im; R = u.x.R
     hogar = 1
     N = S + E + I + Iᵐ + R
-    λ .= P*(β .* ( αₑ*(P' * E)./(P' * N) + αᵢₘ*(P' * Iᵐ)./(P' * N) ))
+    λ .= P*(β .* ( pₑ*(P' * E)./(P' * N) + pᵢₘ*(P' * Iᵐ)./(P' * N) ))
     λ .+= (β[1]*(sum(I)/sum(N))) .* P[:,hogar]
 end
 
@@ -237,8 +264,11 @@ function set_up_inicial_conditions(total_por_clase)
     im0 = zeros(n_clases) #100*ones(n_clases)
     s0 = total_por_clase - e0
     r0 = zeros(n_clases)
+    h0 = zeros(n_clases)
+    hc0 = zeros(n_clases)
+    d0 = zeros(n_clases)
 
-    u0 = ComponentArray(S = s0, E = e0, Im = im0, I = i0, R = r0)
+    u0 = ComponentArray(S = s0, E = e0, Im = im0, I = i0, R = r0, H = h0, Hc = hc0, D = d0)
     return u0
 end
 
@@ -297,6 +327,9 @@ function get_riesgos()
     return [0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
 end
 
+function get_riesgos!(beta)
+    beta = [0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
+end
 
 """
     make_filename(a, beta, nu, phi, gi, gm)
@@ -305,8 +338,23 @@ los parametros usados. La notación es:
 `_` + nombre del parámetro + valor del parámetro
 Para evitar problemas, se usa `-` como separador decimal.
 """
-function make_filename(a₁,a₂, beta, nu, phi, gi, gm)
-    filename = "_a1$a₁ _a2$a₂ _beta$beta _nu$nu _phiei$phi _gi$gi _gm$gm"
+function make_filename(p::ModelParam{Float64})
+    ge = round(p.gamma_e, digits = 2);
+    gi = round(p.gamma_i, digits = 2);
+    gim = round(p.gamma_im, digits = 2);
+    gh = round(p.gamma_h, digits = 2);
+    ghc = round(p.gamma_hc, digits = 2);
+    phiei = round(p.phi_ei, digits = 2);
+    phiir = round(p.phi_ir, digits = 2);
+    phihr = round(p.phi_hr, digits = 2);
+    phid = round(p.phi_d, digits = 2);
+    alpha = round(p.lambda_param.alpha, digits = 2);
+    beta = round(p.lambda_param.beta, digits = 2);
+    pe = round(p.lambda_param.p_E, digits = 2);
+    pin = round(p.lambda_param.p_I, digits = 2);
+    pim = round(p.lambda_param.p_Im, digits = 2);
+
+    filename = "_ge$ge _gi$gi _gim$gim _gh$gh _ghc$ghc _phiei$phiei _phiir$phiir _phihr$phihr _phid$phid _alpha$alpha _beta$beta _pe$pe _pin$pin _pim$pim"
     filename = replace(filename, " " => "")
     filename = replace(filename, "." => "-")
     println(filename)
