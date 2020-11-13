@@ -68,14 +68,9 @@ numero_dias = size(frac)[1]
 
 data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac)
 
-#αᵢₘ = 0.15; αₑ = aᵢₘ/2
-γₑ = 0.14; φ = 0.1;
-dias = 10
-γᵢ = 1/dias; γᵢₘ = 1/dias;
-
-tspan = (0.0,120.0)
-τ = 100. # tiempo de implementar medidas
-
+#############################################
+# Definir parametros
+#############################################
 pᵢₘ = 0.4; pₑ = pᵢₘ/2; β = 3.;
 lambda_param = LambdaParam(1.0, β, pₑ, 1.0, pᵢₘ)
 
@@ -84,9 +79,12 @@ dias = 10
 γₕ = 1/7; γₕ_c = 0.5;
 φₑᵢ = 0.1; φᵢᵣ = 0.9; φₕᵣ = 0.6; φ_d = 0.9;
 p = ModelParam(γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, lambda_param)
+
+tspan = (0.0,120.0)
+τ = 100. # tiempo de implementar medidas
+
 s,e,im,i,r = index_estados(n_clases)
 
-p1 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ)
 #=
 p2 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ,P_cuarentena)
 p3 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_normal)
@@ -94,20 +92,19 @@ p4 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cu
 p5 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_con_clases)
 p6 = set_up_parameters3(αₑ, αᵢₘ, β, β₂, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena)
 =#
-output_folder = "../img/presentacion-investigadores/"
-filename = make_filename(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ)
+output_folder = "..\\..\\img\\SEIIRHHD\\"
+filename = make_filename(p)
 extension = ".svg"
 
 
 ### Resolver
 save_at = 1.
 
+prob_cuarentena = ODEProblem(seiirhhd!,data_u0,tspan,p)
+sol_cuarentena = solve(prob_cuarentena, saveat = save_at);
 
-prob_cuarentena = ODEProblem(seiir!,MyDataArray(u0, P_normal, P_cuarentena, frac),tspan,p1)
-sol_cuarentena = solve(prob_normal, saveat = save_at);
-
-prob_normal = ODEProblem(seiir!, MyDataArray(u0, P_normal, P_normal, frac), tspan, p1)
-sol_normal = solve(prob_cuarentena, save_at = save_at);
+prob_normal = ODEProblem(seiirhhd!,data_u0,tspan,p)
+sol_normal = solve(prob_normal, save_at = save_at);
 #=
 prob_cuarentena = remake(prob_normal; p = p2)
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
@@ -160,8 +157,10 @@ plot_nuevos_contagios(
     labels = ["Sin medidas preventivas" "Teletrabajo y cierre de centros educativos "];
     title = "Contagios diarios")
 plot!(legend=:topright)
-savefig(output_folder*"comparar_nuevos_contagios12"*filename*extension)
+savefig(output_folder*filename*extension)
 
+
+a = 1;
 #=
 
 plot_compare_function_of_sols_grouping(
