@@ -61,8 +61,57 @@ julia> indexs_RM([Symbol("13501"), Symbol("6301")])
 """
 indexs_RM(col_names::Vector{Symbol}) = colname_to_region_number.(col_names) .== 13
 
+"""
+    es_cama_ocupada(col_name::Symbol, str_final::String)
+Recibe un `Symbol` y devuelve `true` si el string asociado al `Symbol` termina
+el `str_final`.
+"""
+function termina_en(col_name::Symbol, str_final::String)
+    str_name = string(col_name)
+    if length(str_name) < length(str_final)
+        false
+    else
+        str_name[end-length(str_final)+1:end] == str_final
+    end
+end
+
+"""
+    es_SS_METRO(col_name::Symbol)
+Recibe un `Symbol` y devuelve `true` si el string asociado comienza con
+`"SS METROPOLITANO"`.
+"""
+es_SS_METRO(col_name::Symbol) = string(col_name)[1:16] == "SS METROPOLITANO"
+
+"""
+    es_vmi_c19_confi(col_name::Symbol)
+Recibe un `Symbol` y devuelve `true` si el string asociado termina en
+`"Vmi covid19 confirmados"`.
+"""
+es_vmi_c19_confi(col_name::Symbol) = termina_en(col_name, "Vmi covid19 confirmados")
+
+"""
+    es_vmi_c19_sosp(col_name::Symbol)
+Recibe un `Symbol` y devuelve `true` si el string asociado termina en
+`"Vmi covid19 sospechosos"`.
+"""
+es_vmi_c19_sosp(col_name::Symbol) = termina_en(col_name, "Vmi covid19 sospechosos")
+
+
+
+"""
+    cols_camas_ocupadas_RM(TS_data::TimeArray)
+Recibe una serie de tiempo y devuelve un serie que solo tiene las columnas
+asociadas a las camas UCI ocupadas de la Región Metropolitana.
+"""
+function cols_c19_RM(TS_data::TimeArray)
+    filter(col -> es_SS_METRO(col) & (es_vmi_c19_sosp(col) | es_vmi_c19_confi(col)), colnames(TS_data))
+end
+
+
 minsal_folder = "C:\\Users\\Tabita\\Documents\\Covid\\Datos-COVID19-MINSAL\\output\\"
 DEIS_data = "producto50\\DefuncionesDEISPorComuna_T.csv"
+reportados_data = "producto26\\CasosNuevosConSintomas_T.csv"
+UCI_data = "producto48\\SOCHIMI_T.csv"
 
 TS_DEIS = TimeArray(CSV.File(minsal_folder * DEIS_data,
         header = 4, datarow = 6,
@@ -71,3 +120,17 @@ TS_DEIS = TimeArray(CSV.File(minsal_folder * DEIS_data,
 )
 full_cols = cols_with_no_missing(TS_DEIS)
 TS_DEIS_RM = TS_DEIS[full_cols[indexs_RM(full_cols)]]
+
+TS_reportados = TimeArray(
+    CSV.File(minsal_folder * reportados_data),
+    timestamp = Symbol("Region")
+)
+TS_reportados_RM = TS_reportados[Symbol("Metropolitana")]
+
+TS_UCI = TimeArray(
+    CSV.File(minsal_folder * UCI_data,
+        header = 3:4, datarow = 5
+    ), timestamp = Symbol("Servicio salud_Serie")
+)
+
+TS_UCI_RM = TS_UCI[cols_c19_RM(TS_UCI)]
