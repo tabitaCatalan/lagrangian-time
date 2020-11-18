@@ -56,6 +56,7 @@ end
     ModelParam
 Esta estructura contiene los parámetros del modelo SEIIRHHD que deben ajustarse.
 # Campos
+- `theta_0`: un valor en [0,1], que da una ponderación de la condición inicial.
 ## Tasas de transición
 Todas las tasas están medidas en 1/día. Eso quiere decir que si la tasa con
 que las personas en una etapa A de la enfermedad pasan a una etapa B es γ,
@@ -85,6 +86,9 @@ posibles estados. Toman valores en [0,1].
     descripción de `LambdaParam` para más detalles.
 """
 struct ModelParam{T}
+    # parametro que pondera la condición inicial
+    #theta_0::T
+    # tasas de contagio
     gamma_e::T
     gamma_i::T
     gamma_im::T
@@ -225,9 +229,10 @@ p_E
 function calcular_lambda!(λ, lambda_param::LambdaParam{Float64}, P, u::MyDataArray{Float64})
     α = p.lambda_param.alpha; β = p.lambda_param.beta .* get_riesgos()
     pₑ = lambda_param.p_E; pᵢ = lambda_param.p_I; pᵢₘ = lambda_param.p_Im
-    S = u.x.S; E = u.x.E; I = u.x.I; Iᵐ = u.x.Im; R = u.x.R
+    S = u.x.S; E = u.x.E; I = u.x.I; Iᵐ = u.x.Im; R = u.x.R;
+    H = u.x.H; Hc = u.x.Hc; D = u.x.D;
     hogar = 1
-    N = S + E + I + Iᵐ + R
+    N = S + E + I + Iᵐ + R + H + Hc + D
     λ .= P*(β .* ( pₑ*(P' * E)./(P' * N) + pᵢₘ*(P' * Iᵐ)./(P' * N) ))
     λ .+= (β[1]*(sum(I)/sum(N))) .* P[:,hogar]
 end

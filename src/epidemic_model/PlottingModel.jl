@@ -193,8 +193,8 @@ end
 Devuelve una tupla con los índices asociados a cada uno de los estados del modelo.
 # Ejemplos
 ```julia
-julia> s, e, im, i, r = index_estados(3)
-(1:3, 4:6, 7:9, 10:12, 13:15)
+julia> s, e, im, i, r, h, hc, d = index_estados(3)
+(1:3, 4:6, 7:9, 10:12, 13:15, 16:18, 19:21, 22:24)
 ```
 """
 function index_estados(n_clases)
@@ -203,7 +203,10 @@ function index_estados(n_clases)
     im = 2*n_clases+1:3*n_clases
     i = 3*n_clases+1:4*n_clases
     r = 4*n_clases+1:5*n_clases
-    s, e, im, i, r
+    h = 5*n_clases+1:6*n_clases
+    hc = 6*n_clases+1:7*n_clases
+    d = 7*n_clases+1:8*n_clases
+    s, e, im, i, r,h, hc, d
 end
 
 """
