@@ -4,7 +4,7 @@ mínimos cuadrados.
 =#
 
 using DifferentialEquations
-
+using DiffEqParamEstim
 ############################
 ### Funciones auxiliares ###
 ############################
@@ -46,16 +46,22 @@ index_muertos(;n_clases = 18) = rango_estado(8, n_clases)
 Calcula para un estado la diferencia entre el número de personas en entre un día
 y el anterior.
 """
-function nuevos_diarios(sol::OrdinaryDiffEq.ODECompositeSolution, estado; index_grupo = 1:18, dias)
+function nuevos_diarios(sol::DiffEqBase.DESolution, estado; index_grupo = 1:18, dias)
     sum(sol'[2:dias+1, estado[index_grupo]] - sol'[1:dias, estado[index_grupo]], dims = 2)
 end
 
 cuantos_dias(t0::Date, t1::Date) = (t1-t0).value
 
+function is_in(dates_1::Vector{Date}, dates_2::Vector{Date})
+  f(date) = date in dates_2
+  f.(dates_1)
+end
+
 function preparar_para_comparar_UCI(sol::OrdinaryDiffEq.ODECompositeSolution, t0::Date, tf::Date)
   dias = cuantos_dias(t0,tf)
   sum(sol'[1:dias, index_uci()], dims = 2)
 end
+
 function preparar_para_comparar_DEIS(sol::OrdinaryDiffEq.ODECompositeSolution, t0::Date, tf::Date)
   dias = cuantos_dias(t0,tf)
   nuevos_diarios(sol, index_muertos(), dias)
@@ -92,47 +98,94 @@ end
 ############################
 
 
-"""
-Creo que data debería ser un diccionario o algo así
-la idea es entregar los datos, una función de la solución
-y un `timestamp` donde comparar.
-"""
-function loss_function(sol, data_sets)
-   tot_loss = 0.0
-   if any((s.retcode != :Success for s in sol))
-     tot_loss = Inf
-   else
-     # calculation for the loss here
-     for data in data_sets
-       tot_loss += generic_loss_totales(data.func(sol), data.data)
-     end
-   end
-   tot_loss
-end
-
-
-"""
-Calcula la diferencia al cuadrado entre la serie de tiempo real para el número
-de personas en algún estado y la serie que predice la solución.
-# Argumentos
-- `sol`: una solución obtenida con `solve` sobre un `ODEProblem`.
-- `index_estado:` rango asociado al estado que se busca. En general será
-  `n_estado * n_clases + 1: n_estado * (n_clases + 1)`
-"""
-function generic_loss_totales(casos_por_dia, TS_data)
-  t₀, t₁ = start_and_finish_dates()
-  ultimo_dia = cuantos_dias(t₀, t₁)
-  nuevos_por_dia_real = suma_por_fila_y_filtrar_fecha(TS_data, t₀, t₁)
-  sum((nuevos_por_dia_real) - (casos_por_dia[1:ultimo_dia+1]))^2
-end
-
 #################################################
 ### Usar Datos:
 ### Requiere haber hecho run de LoadMinsalData.jl
 #################################################
-cuantos_dias(t0,t1)
-UCI_data_array = preparar_para_comparar_UCI(TS_UCI_RM, t0,t1)
-prepa
+function is_failure(sol::DiffEqBase.DESolution)
+  if sol isa DiffEqBase.AbstractEnsembleSolution
+    failure = any((s.retcode != :Success for s in sol)) && any((s.retcode != :Terminated for s in sol))
+  else
+    failure = sol.retcode != :Success && sol != :Terminated
+  end
+  failure
+end
+
+struct LossUCI{T,D} <: DiffEqBase.DECostFunction
+  t::T
+  data::D
+end
+
+function (f::LossUCI)(sol::DiffEqBase.DESolution)
+  is_failure(sol) && return Inf
+
+  sum((sum(sol'[f.t, index_uci()], dims = 2) - f.data).^2)
+end
+
+t_dates = collect(t0:Dates.Day(1):t1)
+t = collect(1:cuantos_dias(t0,t1)+1)
+UCI_data_array = drop_missing_and_vectorize(preparar_para_comparar_UCI(TS_UCI_RM, t0,t1))
+dias_comparables = is_in(t_dates, timestamp(TS_UCI_RM[t_dates]))
+lossUCI = LossUCI(t[dias_comparables], UCI_data_array)
+lossUCI(sol_cuarentena)
+
+########### Fallecidos ################
+
+struct LossDEIS{T,D} <: DiffEqBase.DECostFunction
+  dias::T
+  data::D
+end
+
+function (f::LossDEIS)(sol::DiffEqBase.DESolution)
+  is_failure(sol) && return Inf
+
+  sum((nuevos_diarios(sol, index_muertos(),dias =  f.dias + 1) - f.data).^2)
+end
+
+
+lossDEIS = LossDEIS(cuantos_dias(t0,t1), DEIS_data_array)
+lossDEIS(sol_cuarentena)
+
+######### Reportados #########################
+struct LossRep{T,D} <: DiffEqBase.DECostFunction
+  dias::T
+  data::D
+end
+
+function (f::LossRep)(sol::DiffEqBase.DESolution)
+  is_failure(sol) && return Inf
+
+  sum((nuevos_diarios(sol, index_susc(),dias =  f.dias + 1) + f.data).^2)
+end
+
+lossRep = LossRep(cuantos_dias(t0,t1), reportados_data_array)
+lossRep(sol_cuarentena)
+
+loss(sol) = lossUCI(sol) + lossDEIS(sol) + lossRep(sol)
+
+DEIS_data_array = drop_missing_and_vectorize(preparar_para_comparar_DEIS(TS_DEIS_RM, t0, t1))
+lossDEIS = L2Loss(t, DEIS_data_array)
+
+reportados_data_array = drop_missing_and_vectorize(preparar_para_comparar_reportados(TS_reportados_RM, t0,t1))
+lossRep = L2Loss(t, reportados_data_array)
+
+
+sum(ismissing.(UCI_data_array))
+
+typeof(UCI_data_array)
+
+plot(sol_cuarentena'[:, index_uci()])
+
+index_uci()
+function drop_missing_and_vectorize(array2)
+  L = length(array2)
+  vector = Vector{Float64}(undef, L)
+  for l in 1:L
+    vector[l] = Float64(array2[l])
+  end
+  vector
+end
+
 
 using Plots
 scatter(preparar_para_comparar_UCI(TS_UCI_RM, t0, t1))
@@ -142,6 +195,8 @@ struct MinsalData
   func::
   data::TimeArray
 end
+
+typeof(timestamp(TS_UCI))
 
 
 loss_function(sol_cuarentena, (DEIS, UCI))
@@ -204,3 +259,67 @@ A[:a]
 sol_cuarentena.prob.p
 
 isbits(sol_cuarentena)
+
+L2Loss
+
+function (f::L2Loss)(sol::DiffEqBase.DESolution)
+  data = f.data
+  weight = f.data_weight
+  diff_weight = f.differ_weight
+  colloc_grad = f.colloc_grad
+  dudt = f.dudt
+
+  if sol isa DiffEqBase.AbstractEnsembleSolution
+    failure = any((s.retcode != :Success for s in sol)) && any((s.retcode != :Terminated for s in sol))
+  else
+    failure = sol.retcode != :Success && sol != :Terminated
+  end
+  failure && return Inf
+
+  sumsq = 0.0
+
+  if weight == nothing
+    @inbounds for i in 2:length(sol)
+      for j in 1:length(sol[i])
+        sumsq +=(data[j,i] - sol[j,i])^2
+      end
+      if diff_weight != nothing
+          for j in 1:length(sol[i])
+            if typeof(diff_weight) <: Real
+              sumsq += diff_weight*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
+            else
+             sumsq += diff_weight[j,i]*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
+            end
+          end
+      end
+    end
+  else
+    @inbounds for i in 2:length(sol)
+      if typeof(weight) <: Real
+        for j in 1:length(sol[i])
+          sumsq = sumsq + ((data[j,i] - sol[j,i])^2)*weight
+        end
+      else
+        for j in 1:length(sol[i])
+          sumsq = sumsq + ((data[j,i] - sol[j,i])^2)*weight[j,i]
+        end
+      end
+      if diff_weight != nothing
+        for j in 1:length(sol[i])
+          if typeof(diff_weight) <: Real
+            sumsq += diff_weight*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
+          else
+            sumsq += diff_weight[j,i]*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
+          end
+        end
+      end
+    end
+  end
+  if colloc_grad != nothing
+    for i = 1:size(colloc_grad)[2]
+      sol.prob.f.f(@view(dudt[:,i]), sol.u[i], sol.prob.p, sol.t[i])
+    end
+    sumsq += sum(abs2, x - y for (x,y) in zip(dudt, colloc_grad))
+  end
+  sumsq
+end
