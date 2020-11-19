@@ -144,6 +144,7 @@ end
 
 
 lossDEIS = LossDEIS(cuantos_dias(t0,t1), DEIS_data_array)
+
 lossDEIS(sol_cuarentena)
 
 ######### Reportados #########################
