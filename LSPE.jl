@@ -102,6 +102,23 @@ end
 ### Usar Datos:
 ### Requiere haber hecho run de LoadMinsalData.jl
 #################################################
+function drop_missing_and_vectorize(array2)
+  L = length(array2)
+  vector = Vector{Float64}(undef, L)
+  for l in 1:L
+    vector[l] = Float64(array2[l])
+  end
+  vector
+end
+
+t0, t1 = start_and_finish_dates()
+
+UCI_data_array = drop_missing_and_vectorize(preparar_para_comparar_UCI(TS_UCI_RM, t0, t1))
+DEIS_data_array = drop_missing_and_vectorize(preparar_para_comparar_DEIS(TS_DEIS_RM, t0, t1))
+reportados_data_array = drop_missing_and_vectorize(preparar_para_comparar_reportados(TS_reportados_RM, t0,t1))
+
+
+################################################
 function is_failure(sol::DiffEqBase.DESolution)
   if sol isa DiffEqBase.AbstractEnsembleSolution
     failure = any((s.retcode != :Success for s in sol)) && any((s.retcode != :Terminated for s in sol))
@@ -163,55 +180,36 @@ lossRep = LossRep(cuantos_dias(t0,t1), reportados_data_array)
 lossRep(sol_cuarentena)
 
 loss(sol) = lossUCI(sol) + lossDEIS(sol) + lossRep(sol)
+loss(sol_normal)
 
-DEIS_data_array = drop_missing_and_vectorize(preparar_para_comparar_DEIS(TS_DEIS_RM, t0, t1))
-lossDEIS = L2Loss(t, DEIS_data_array)
+lossDEIS(sol_normal )
 
-reportados_data_array = drop_missing_and_vectorize(preparar_para_comparar_reportados(TS_reportados_RM, t0,t1))
-lossRep = L2Loss(t, reportados_data_array)
+sol_cuarentena'
+sol_normal'
+prob_generator = (prob,p) -> remake(prob,p=p)
+
+save_at
+cost_function = build_loss_objective(prob_cuarentena,Tsit5(),loss, prob_generator = prob_generator,  saveat = save_at)
+
+cost_function(p0)
+
+using Optim
+
+p0 = [γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, 1.0, β, pₑ, 1.0, pᵢₘ]
+
+Optim.optimize(cost_function, p0, Optim.BFGS())
+
+loss(sol_cuarentena)
 
 
-sum(ismissing.(UCI_data_array))
 
-typeof(UCI_data_array)
 
-plot(sol_cuarentena'[:, index_uci()])
-
-index_uci()
-function drop_missing_and_vectorize(array2)
-  L = length(array2)
-  vector = Vector{Float64}(undef, L)
-  for l in 1:L
-    vector[l] = Float64(array2[l])
-  end
-  vector
-end
 
 
 using Plots
 scatter(preparar_para_comparar_UCI(TS_UCI_RM, t0, t1))
 
 
-struct MinsalData
-  func::
-  data::TimeArray
-end
-
-typeof(timestamp(TS_UCI))
-
-
-loss_function(sol_cuarentena, (DEIS, UCI))
-generic_loss_totales(UCI.func(sol_cuarentena), UCI.data)
-
-loss_DEIS(sol_cuarentena, TS_DEIS_RM)
-fechas_sol = times_frac[1:length(sol_cuarentena.t)]
-DEIS = (func = estado_DEIS, data = TS_DEIS_RM)
-UCI = (func = estado_UCI, data = TS_UCI_RM)
-
-generic_loss_totales(UCI.func(sol_cuarentena), UCI.data)
-
-UCI.func(sol_cuarentena)
-UCI.data
 
 begin
   plot1 = plot(fechas_sol[1:end-1], estado_reportados(sol_cuarentena), title = "Reportados")
@@ -226,18 +224,6 @@ begin
   plot(plot1, plot2, plot3, layout = (1,3))
 end
 
-UCI.func(sol_cuarentena)
-UCI.data
-
-
-typeof(sol_cuarentena)
-times_frac
-
-
-
-
-
-nuevo
 fallecidos_real = sum(values(TS_DEIS_RM[t₀:Dates.Day(1):t₁]), dims= 2)
 log.(fallecidos_real)
 nuevos_muertos = sum(sol_cuarentena'[1:end-1, d] - sol_cuarentena'[2:end, d], dims = 2)
@@ -245,82 +231,6 @@ log.(nuevos_muertos)
 sum(log.(fallecidos_real) - log.(nuevos_muertos[1:ultimo_dia]))^2
 fallecidos_real
 
-values
 
 # necesito una funcion que mapee Symbol a tramo,
 # para eso necesito los datos SQL.
-
-DEIS_data[Date(2020,4,5)]
-Dict([(:data, TS_DEIS_RM),(:func, )])
-
-A = Dict([(:a, 1), (:b, 2)])
-
-A[:a]
-
-sol_cuarentena.prob.p
-
-isbits(sol_cuarentena)
-
-L2Loss
-
-function (f::L2Loss)(sol::DiffEqBase.DESolution)
-  data = f.data
-  weight = f.data_weight
-  diff_weight = f.differ_weight
-  colloc_grad = f.colloc_grad
-  dudt = f.dudt
-
-  if sol isa DiffEqBase.AbstractEnsembleSolution
-    failure = any((s.retcode != :Success for s in sol)) && any((s.retcode != :Terminated for s in sol))
-  else
-    failure = sol.retcode != :Success && sol != :Terminated
-  end
-  failure && return Inf
-
-  sumsq = 0.0
-
-  if weight == nothing
-    @inbounds for i in 2:length(sol)
-      for j in 1:length(sol[i])
-        sumsq +=(data[j,i] - sol[j,i])^2
-      end
-      if diff_weight != nothing
-          for j in 1:length(sol[i])
-            if typeof(diff_weight) <: Real
-              sumsq += diff_weight*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
-            else
-             sumsq += diff_weight[j,i]*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
-            end
-          end
-      end
-    end
-  else
-    @inbounds for i in 2:length(sol)
-      if typeof(weight) <: Real
-        for j in 1:length(sol[i])
-          sumsq = sumsq + ((data[j,i] - sol[j,i])^2)*weight
-        end
-      else
-        for j in 1:length(sol[i])
-          sumsq = sumsq + ((data[j,i] - sol[j,i])^2)*weight[j,i]
-        end
-      end
-      if diff_weight != nothing
-        for j in 1:length(sol[i])
-          if typeof(diff_weight) <: Real
-            sumsq += diff_weight*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
-          else
-            sumsq += diff_weight[j,i]*((data[j,i] - data[j,i-1] - sol[j,i] + sol[j,i-1])^2)
-          end
-        end
-      end
-    end
-  end
-  if colloc_grad != nothing
-    for i = 1:size(colloc_grad)[2]
-      sol.prob.f.f(@view(dudt[:,i]), sol.u[i], sol.prob.p, sol.t[i])
-    end
-    sumsq += sum(abs2, x - y for (x,y) in zip(dudt, colloc_grad))
-  end
-  sumsq
-end

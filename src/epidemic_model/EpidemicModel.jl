@@ -175,6 +175,10 @@ function matrix_ponderation!(P, P_normal, P_cuarentena, frac_cuarentena_por_clas
     P .= frac_cuarentena_por_clase[mapping] .* P_cuarentena + (1 .- frac_cuarentena_por_clase[mapping]) .* P_normal
 end
 
+function make_model_param(p)
+  ModelParam(p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], LambdaParam(p[10], p[11], p[12], p[13], p[14]))
+end
+
 """
     seiirhhd!(du,u,p,t)
 Modelo epidemiológico tipo SEIIRHHD
@@ -184,8 +188,9 @@ Modelo epidemiológico tipo SEIIRHHD
 - `p::ModelParam`
 - `t`:
 """
-function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p::ModelParam{Float64},t)
+function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p_vec::Vector{Float64},t)
     # Extraer parametros
+    p = make_model_param(p_vec)
     γₑ = p.gamma_e; γᵢ = p.gamma_i; γᵢₘ = p.gamma_im
     γₕ = p.gamma_h; γₕ_c = p.gamma_hc
     φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d

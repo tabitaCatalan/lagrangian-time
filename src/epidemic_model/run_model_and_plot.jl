@@ -64,7 +64,7 @@ frac, times_frac= obtener_frac_cuarentena_from_csv(
     modo  =:cuarentena
 )
 
-TS_frac = TimeArray(times_frac, frac, [:T1, :T2, :T3])
+#TS_frac = TimeArray(times_frac, frac, [:T1, :T2, :T3])
 
 numero_dias = size(frac)[1]
 
@@ -81,6 +81,7 @@ dias = 10
 γₕ = 1/7; γₕ_c = 0.5;
 φₑᵢ = 0.1; φᵢᵣ = 0.9; φₕᵣ = 0.6; φ_d = 0.9;
 p = ModelParam(γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, lambda_param)
+p_vec = [γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, 1.0, β, pₑ, 1.0, pᵢₘ]
 
 tspan = (0.0,120.0)
 τ = 100. # tiempo de implementar medidas
@@ -102,18 +103,27 @@ extension = ".svg"
 ### Resolver
 save_at = 1.
 
-prob_cuarentena = ODEProblem(seiirhhd!,data_u0,tspan,p)
+prob_cuarentena = ODEProblem(seiirhhd!,data_u0,tspan,p_vec)
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at);
 
-prob_normal = ODEProblem(seiirhhd!,data_u0,tspan,p)
-sol_normal = solve(prob_normal, save_at = save_at);
+prob_normal = ODEProblem(seiirhhd!,data_u0,tspan,p_vec)
+sol_normal = solve(prob_normal, saveat = save_at);
+
+sol_normal.t
+tspan
+
+prob2 = remake(prob_cuarentena, p = p_vec)
+sol2 = solve(prob2)
+
+length(sol2.t)
+a= 1
 #=
 prob_cuarentena = remake(prob_normal; p = p2)
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
 =#
 
 
-plot_all_states(sol_normal, n_clases, nombre_clases; indexs = joven)
+#plot_all_states(sol_normal, n_clases, nombre_clases; indexs = joven)
 
 #=
 plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
@@ -152,7 +162,7 @@ plot_nuevos_contagios(
     title = "Contagios diarios")
 savefig(output_folder*"comparar_nuevos_contagios2456"*filename*extension)
 =#
-
+#=
 plot_nuevos_contagios(
     [sol_normal, sol_cuarentena],
     n_clases,
@@ -162,7 +172,7 @@ plot!(legend=:topright)
 savefig(output_folder*filename*extension)
 
 
-a = 1;
+a = 1;=#
 #=
 
 plot_compare_function_of_sols_grouping(
