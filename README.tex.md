@@ -46,11 +46,10 @@ $$
 \right)
 $$
 
-
-
-Hno Nelson
-Pastor Juan Bautista
-Hno Carlos
+Comparamos con la tasa de contagios que se usaba en el reporte 3 por ejemplo:
+$$
+\lambda_i(t) = \sum_{j=1}^{n} \frac{\alpha(t)p_EC_{ij}E_{j} + \alpha(t)p_{I^m}C_{ij}I_j^m + \delta_{p_I}C_{ij}I_j}{N_j}
+$$
 
 
 

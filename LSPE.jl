@@ -43,7 +43,7 @@ index_muertos(;n_clases = 18) = rango_estado(8, n_clases)
 ##### Preparar solución y datos para comparar #####
 """
   nuevos_diarios(sol, estado; index_grupo = 1:18)
-Calcula para un estado la diferencia entre el número de personas en entre un día
+Calcula para un estado la diferencia entre el número de personas entre un día
 y el anterior.
 """
 function nuevos_diarios(sol::DiffEqBase.DESolution, estado; index_grupo = 1:18, dias)
@@ -64,27 +64,15 @@ end
 
 function preparar_para_comparar_DEIS(sol::OrdinaryDiffEq.ODECompositeSolution, t0::Date, tf::Date)
   dias = cuantos_dias(t0,tf)
-  nuevos_diarios(sol, index_muertos(), dias)
+  nuevos_diarios(sol, index_muertos(), dias = dias)
 end
 function preparar_para_comparar_reportados(sol::OrdinaryDiffEq.ODECompositeSolution, t0::Date, tf::Date)
   dias = cuantos_dias(t0,tf)
-  - nuevos_diarios(sol, index_susc(), dias)
+  - nuevos_diarios(sol, index_susc(), dias = dias)
 end
 
 function suma_por_fila_y_filtrar_fecha(TS::TimeArray, t0::Date, tf::Date)
   sum(values(TS[t0:Dates.Day(1):tf]), dims = 2)
-end
-
-function preparar_para_comparar_UCI(TS_UCI::TimeArray, t0::Date, tf::Date)
-  suma_por_fila_y_filtrar_fecha(TS_UCI, t0, tf)
-end
-
-function preparar_para_comparar_DEIS(TS_DEIS::TimeArray, t0::Date, tf::Date)
-  suma_por_fila_y_filtrar_fecha(TS_DEIS, t0, tf)
-end
-
-function preparar_para_comparar_reportados(TS_reportados::TimeArray, t0::Date, tf::Date)
-  suma_por_fila_y_filtrar_fecha(TS_reportados, t0, tf)
 end
 
 function start_and_finish_dates()
@@ -93,15 +81,6 @@ function start_and_finish_dates()
   t0, tf
 end
 
-############################
-### Funciones de pérdida ###
-############################
-
-
-#################################################
-### Usar Datos:
-### Requiere haber hecho run de LoadMinsalData.jl
-#################################################
 function drop_missing_and_vectorize(array2)
   L = length(array2)
   vector = Vector{Float64}(undef, L)
@@ -113,12 +92,10 @@ end
 
 t0, t1 = start_and_finish_dates()
 
-UCI_data_array = drop_missing_and_vectorize(preparar_para_comparar_UCI(TS_UCI_RM, t0, t1))
-DEIS_data_array = drop_missing_and_vectorize(preparar_para_comparar_DEIS(TS_DEIS_RM, t0, t1))
-reportados_data_array = drop_missing_and_vectorize(preparar_para_comparar_reportados(TS_reportados_RM, t0,t1))
+############################
+### Funciones de pérdida ###
+############################
 
-
-################################################
 function is_failure(sol::DiffEqBase.DESolution)
   if sol isa DiffEqBase.AbstractEnsembleSolution
     failure = any((s.retcode != :Success for s in sol)) && any((s.retcode != :Terminated for s in sol))
@@ -128,22 +105,35 @@ function is_failure(sol::DiffEqBase.DESolution)
   failure
 end
 
+############## UCI #################
+
 struct LossUCI{T,D} <: DiffEqBase.DECostFunction
   t::T
   data::D
 end
 
+function estadoUCI(t, sol)
+  sum(sol'[t, index_uci()], dims = 2)
+end
+
 function (f::LossUCI)(sol::DiffEqBase.DESolution)
   is_failure(sol) && return Inf
 
-  sum((sum(sol'[f.t, index_uci()], dims = 2) - f.data).^2)
+  sum((estadoUCI(f.t, sol) - f.data).^2)
 end
 
-t_dates = collect(t0:Dates.Day(1):t1)
-t = collect(1:cuantos_dias(t0,t1)+1)
-UCI_data_array = drop_missing_and_vectorize(preparar_para_comparar_UCI(TS_UCI_RM, t0,t1))
-dias_comparables = is_in(t_dates, timestamp(TS_UCI_RM[t_dates]))
-lossUCI = LossUCI(t[dias_comparables], UCI_data_array)
+function construir_loss_UCI(TS_UCI::TimeArray, t0::Date, t1::Date)
+  t_dates = collect(t0:Dates.Day(1):t1)
+  t = collect(1:cuantos_dias(t0,t1)+1)
+  UCI_data_array = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS_UCI_RM, t0,t1))
+  dias_comparables = is_in(t_dates, timestamp(TS_UCI_RM[t_dates]))
+  lossUCI = LossUCI(t[dias_comparables], UCI_data_array)
+  lossUCI
+end
+
+lossUCI = construir_loss_UCI(TS_UCI_RM, t0, t1)
+scatter(lossUCI.t, lossUCI.data, title = "Datos UCI", legend =:none)
+
 lossUCI(sol_cuarentena)
 
 ########### Fallecidos ################
@@ -153,76 +143,202 @@ struct LossDEIS{T,D} <: DiffEqBase.DECostFunction
   data::D
 end
 
-function (f::LossDEIS)(sol::DiffEqBase.DESolution)
-  is_failure(sol) && return Inf
-
-  sum((nuevos_diarios(sol, index_muertos(),dias =  f.dias + 1) - f.data).^2)
+function estadoDEIS(dias, sol)
+    nuevos_diarios(sol, index_muertos(),dias = dias + 1)
 end
 
 
-lossDEIS = LossDEIS(cuantos_dias(t0,t1), DEIS_data_array)
+function (f::LossDEIS)(sol::DiffEqBase.DESolution)
+  is_failure(sol) && return Inf
 
-lossDEIS(sol_cuarentena)
+  sum(( estadoDEIS(f.dias, sol)- f.data).^2)
+end
 
-######### Reportados #########################
+
+function construir_loss_DEIS(TS_DEIS::TimeArray, t0::Date, t1::Date)
+  DEIS_data_array = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS_DEIS_RM, t0, t1))
+  lossDEIS = LossDEIS(cuantos_dias(t0,t1), DEIS_data_array)
+  lossDEIS
+end
+
+lossDEIS = construir_loss_DEIS(TS_DEIS_RM, t0, t1)
+scatter(lossDEIS.data, title = "Datos DEIS")
+
+################## Reportados #####################
 struct LossRep{T,D} <: DiffEqBase.DECostFunction
   dias::T
   data::D
 end
 
+function estadoRep(dias, sol)
+  - nuevos_diarios(sol, index_susc(),dias =  dias + 1)
+end
+
+
 function (f::LossRep)(sol::DiffEqBase.DESolution)
   is_failure(sol) && return Inf
 
-  sum((nuevos_diarios(sol, index_susc(),dias =  f.dias + 1) + f.data).^2)
+  sum(( estadoRep(f.dias, sol) - f.data).^2)
 end
 
-lossRep = LossRep(cuantos_dias(t0,t1), reportados_data_array)
-lossRep(sol_cuarentena)
+
+function construir_loss_rep(TS_rep::TimeArray, t0::Date, t1::Date)
+  reportados_data_array = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS_rep, t0, t1))
+  lossRep = LossRep(cuantos_dias(t0,t1), reportados_data_array)
+  lossRep
+end
+
+lossRep = construir_loss_rep(TS_reportados_RM, t0, t1)
+scatter(lossRep.data, title = "Datos Reportados")
+################### Total ########################
 
 loss(sol) = lossUCI(sol) + lossDEIS(sol) + lossRep(sol)
-loss(sol_normal)
 
-lossDEIS(sol_normal )
+####################################################
+### Optimizar los parámetros                     ###
+### Requiere haber corrido run_model_and_plot.jl ###
+####################################################
 
-sol_cuarentena'
-sol_normal'
-prob_generator = (prob,p) -> remake(prob,p=p)
+copy_data_u0 = copy(data_u0)
+prob_generator = (prob,p) -> remake(prob,u0 = update_initial_condition!(copy_data_u0, p), p=(p0_model_cte, p0_lmbda_cte))
+prob_generator_full = (prob,p) -> remake(prob,u0 = update_initial_condition!(copy_data_u0, p), p=(p[9:17],p[18:22]))
 
-save_at
-cost_function = build_loss_objective(prob_cuarentena,Tsit5(),loss, prob_generator = prob_generator,  saveat = save_at)
+#using Traceur
 
-cost_function(p0)
+#@time cost_function(p0)
+
+saveat = 1.0
+cost_function = build_loss_objective(prob_cuarentena,Tsit5(),
+  loss, prob_generator = prob_generator,
+  saveat = saveat,
+  maxiters = 10000
+  )
+
+cost_function_full = build_loss_objective(prob_cuarentena,Tsit5(),
+  loss, prob_generator = prob_generator_full,
+  saveat = saveat,
+  maxiters = 10000
+  )
+#using Zygote
+
+cost_function_full(p0)
+cost_function_full(p_10kiter)
+
+
+#function g!(G, x)
+#    G .=  cost_function'(x)
+#end
+prob_cuarentena
 
 using Optim
 
-p0 = [γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, 1.0, β, pₑ, 1.0, pᵢₘ]
 
-Optim.optimize(cost_function, p0, Optim.BFGS())
+function update_initial_condition!(data_u0::MyDataArray, u0_params)
+  data_u0.x.S = u0_params[1] * data_u0.total_por_clase
+  data_u0.x.E = u0_params[2] * data_u0.total_por_clase
+  data_u0.x.I = u0_params[3] * data_u0.total_por_clase
+  data_u0.x.Im = u0_params[4] * data_u0.total_por_clase
+  data_u0.x.R = u0_params[5] * data_u0.total_por_clase
+  data_u0.x.H = u0_params[6] * data_u0.total_por_clase
+  data_u0.x.Hc = u0_params[7] * data_u0.total_por_clase
+  data_u0.x.D = u0_params[8] * data_u0.total_por_clase
+  data_u0
+end
 
-loss(sol_cuarentena)
+data_u0.total_por_clase
+lossUCI.data
+lossRep.data
+
+s0 = 0.9; e0 = 0.02; i0 = 0.02; im0 = 0.01; r0 = 0.02; h0 = 0.01; hc0=0.01; d0=0.01;
+u0_params = [s0, e0, i0, im0, r0, h0, hc0, d0]
+sum(u0_params)
+lower_u0 = [0., 0., 0., 0., 0., 0., 0., 0.]
+upper_u0 = [1., 1., 1., 1., 1., 1., 1., 1.]
+
+const p0_model_cte = p0_model
+p0_model = [γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d]
+lower_model = [0.01, 0.01, 0.01, 0.01, 0.01, 0.0, 0.0, 0.0, 0.0]
+upper_model = [5., 5, 5., 5., 5., 1.0, 1.0, 1.0, 1.0]
+
+const p0_lmbda_cte = p0_lmbda
+p0_lmbda = [1.0, β, pₑ, 1.0, pᵢₘ]
+lower_lmbda = [0.5, 0.1, 0.0, 0.0, 0.0]
+upper_lmbda = [1.0, 6.0, 1.0, 1.0, 1.0]
 
 
+p0 = [u0_params;p0_model; p0_lmbda]
+lower = [lower_u0; lower_model; lower_lmbda]
+upper = [upper_u0; upper_model; upper_lmbda]
+
+prob2 = prob_generator(prob_cuarentena, p0)
+sol2 = solve(prob2, saveat = 1.0)
 
 
+cost_function(u0_params)
+using Flux
+res = Optim.optimize(
+  cost_function,
+  lower_u0, upper_u0,
+  u0_params,
+  Fminbox(Optim.BFGS()), Optim.Options(iterations = 1)
+)
 
+
+using BlackBoxOptim
+
+bboptimize(cost_function; SearchRange = (i -> (lower_u0[i], upper_u0[i])).(1:8))
+p_res = [0.0981235, 0.000751838, 4.38449e-5, 0.000295247, 0.117949, 0.000234054, 2.25681e-5, 0.0352279]
+
+res_full = bboptimize(cost_function_full; SearchRange = (i -> (lower[i], upper[i])).(1:22))
+p_10kiter = [0.100961, 0.00440102, 0.0613713, 0.0991362, 0.508734, 0.726285, 0.000135861, 0.608562, 0.0100703, 3.82787, 3.98219, 0.0182238, 0.0705907, 0.280078, 0.745378, 0.999952, 0.00671096, 0.722137, 0.970178, 0.929587, 0.96598, 0.00962657]
+
+opt_pro_full = bbsetup(cost_function_full; SearchRange = (i -> (lower[i], upper[i])).(1:22), TraceMode = :silent);
+bboptimize(opt_pro_full)
+
+res_full = bboptimize(cost_function_full; SearchRange = , MaxSteps=50000)
+
+res_full.elapsed_time
+prob_ini = prob_generator(prob_cuarentena,p0)
+sol_ini = solve(prob_ini, saveat = 1.0)
+
+plot_comparar_datos(sol_ini)
+plot_comparar_datos(sol_res)
+plot(sol_res)
 
 using Plots
 scatter(preparar_para_comparar_UCI(TS_UCI_RM, t0, t1))
 
 
 
-begin
-  plot1 = plot(fechas_sol[1:end-1], estado_reportados(sol_cuarentena), title = "Reportados")
-  scatter!(plot1, timestamp(TS_reportados_RM), estado_DEIS(TS_reportados_RM))
 
-  plot2 = plot(fechas_sol, estado_UCI(sol_cuarentena), title = "UCI" )
-  scatter!(plot2, timestamp(TS_UCI_RM), estado_UCI(TS_UCI_RM))
+cuantos_dias(t0,t1)
 
-  plot3 = plot(fechas_sol[1:end-1], estado_DEIS(sol_cuarentena), title = "Fallecidos")
-  scatter!(plot3, timestamp(TS_DEIS_RM), estado_DEIS(TS_DEIS_RM))
+fechas_sol = t0:Dates.Day(1):t1
+function plot_comparar_datos(sol)
+  fechas = fechas_sol[1:cuantos_dias(t0,t1)]
+
+  plot1 = plot(fechas, preparar_para_comparar_reportados(sol, t0, t1), title = "Reportados")
+  scatter!(plot1, fechas, lossRep.data)
+
+  plot2 = plot(fechas, preparar_para_comparar_UCI(sol, t0,t1), title = "UCI" )
+  scatter!(plot2, fechas[lossUCI.t[1:end-1]], lossUCI.data[1:end-1])
+
+  plot3 = plot(fechas, preparar_para_comparar_DEIS(sol,t0,t1), title = "Fallecidos")
+  scatter!(plot3,fechas, lossDEIS.data)
 
   plot(plot1, plot2, plot3, layout = (1,3))
 end
+
+fechas = fechas_sol[1:cuantos_dias(t0,t1)]
+length(fechas)
+lossUCI.t[end]
+plot_comparar_datos(sol_res)
+preparar_para_comparar_DEIS(sol2, t0, t1)
+lossUCI.data
+UCI_data_array[1]
+DEIS_data_array[1]
+reportados_data_array[1]
+t1
 
 fallecidos_real = sum(values(TS_DEIS_RM[t₀:Dates.Day(1):t₁]), dims= 2)
 log.(fallecidos_real)
