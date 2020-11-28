@@ -50,6 +50,10 @@ function nuevos_diarios(sol::DiffEqBase.DESolution, estado; index_grupo = 1:18, 
     sum(sol'[2:dias+1, estado[index_grupo]] - sol'[1:dias, estado[index_grupo]], dims = 2)
 end
 
+function nuevos_diarios(sol::DiffEqBase.DESolution, estado; index_grupo = 1:18)
+    sum(sol'[2:end, estado[index_grupo]] - sol'[1:end-1, estado[index_grupo]], dims = 2)
+end
+
 cuantos_dias(t0::Date, t1::Date) = (t1-t0).value
 
 function is_in(dates_1::Vector{Date}, dates_2::Vector{Date})
@@ -108,58 +112,83 @@ end
 ############## UCI #################
 
 """
-Recibe un vector ordenado (creciente) de `Date`s, y devuelve cuántos de ellos
-son iguales o anteriores a la fecha `tf`.
+Recibe un vector ordenado (creciente) de `Date`s, y devuelve un rango de las
+fechas que están en [t0,tf].
 """
-function cuantos_datos_hasta_tf_sol(dias::Vector{Date}, tf::Date)
-  findfirst(dias .> tf) - 1
+function index_dias_entre_t0_y_tf(dias::Vector{Date}, t0::Date, tf::Date)
+  if t0 > tf
+    error("t0 debe ser una fecha anterior que tf. Entrgó t0 = $t0 y tf = $tf.")
+  end
+  primero = findfirst(dias .>= t0)
+  ultimo = findlast(dias .<= tf)
+  if isnothing(primero) | isnothing(ultimo) # no hay datos en el intervalo [t0,tf]
+    error("No hay datos entre $t0 y $tf")
+  else
+   primero:ultimo
+ end
 end
 
+#= TEST
+index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,3), Date(2020,3,5)) == 2:2
+index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,4), Date(2020,3,4)) == 2:2
+index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,3), Date(2020,3,6)) == 2:3
+index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,2), Date(2020,3,5)) == 1:2
+# Estos deben dar error
+index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,6), Date(2020,3,5))
+index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,7), Date(2020,3,8))
+index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,1), Date(2020,3,1))
+=#
 
-struct LossData{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
+a = 1
+
+struct LossData3{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
   t0::D
   tf::D
   dias::Vector{D}
   data::Vector{T}
   index_dias::Vector{I}
 
-  function LossData(dias::Vector{Date}, data::Vector{T}, tf_sol::Date) where {T<:Real}
+  function LossData3(dias::Vector{Date}, data::Vector{T}, t0_sol::Date, tf_sol::Date) where {T<:Real}
     if length(data) != length(dias)
       error("Los vectores `dias` y `data` deben ser del mismo largo.")
     end
-    t0 = dias[1]
-    full_dias = collect(dias[1]:Dates.Day(1):dias[end])
+    index_en_rango = index_dias_entre_t0_y_tf(dias, t0_sol, tf_sol)
+
+    t0 = dias[index_en_rango[1]]
+    tf = dias[index_en_rango[end]]
+
+    full_dias = collect(t0:Dates.Day(1):tf)
     full_index = collect(1:length(full_dias))
-    is_in(dias, full_dias)
     index_dias = full_index[is_in(full_dias, dias)]
 
-    n_datos = cuantos_datos_hasta_tf_sol(dias, tf_sol)
-
-    tf = dias[n_datos]
-    new{Date,T,eltype(index_dias)}(t0,tf,dias[1:n_datos],data[1:n_datos],index_dias[1:n_datos])
+    new{Date,T,eltype(index_dias)}(t0,tf,dias[index_en_rango],data[index_en_rango],index_dias)
   end
 end
+lossRep = LossData3(TS_reportados_RM, sol_cuarentena, t0_sol)
 
-function LossData(TS::TimeArray, tf_sol::Date)
+
+
+
+function LossData3(TS::TimeArray, t0_sol::Date, tf_sol::Date)
   dias = timestamp(TS)
   data = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS, dias[1],dias[end]))
 
-  LossData(dias,data, tf_sol)
+  LossData3(dias,data,t0_sol, tf_sol)
 end
 
-function LossData(TS::TimeArray, sol::DiffEqBase.DESolution)
-  n_dias = Integer(sol_cuarentena.t[end] - sol_cuarentena.t[1]) + 1
-  tf_sol = t0_sol + Dates.Day(n_dias) - 1
-  LossData(TS, tf_sol)
+function LossData3(TS::TimeArray, sol::DiffEqBase.DESolution, t0_sol::Date)
+  tf_sol = dia_final_sol(sol, t0_sol)
+  LossData3(TS, t0_sol, tf_sol)
 end
 
-Integer(sol_cuarentena.t[end])
+function dia_final_sol(sol::DiffEqBase.DESolution, t0_sol::Date)
+  n_dias = Integer(sol_cuarentena.t[end] - sol_cuarentena.t[1])
+  tf_sol = t0_sol + Dates.Day(n_dias)
+  tf_sol
+end
 
-
-LossData(TS_UCI_SS_RM, Date(2020,7,1))
-
-sol_cuarentena
-
+t0_sol = Date(2020,3,17)
+#=
 """
   LossData(sol_vec, t0_sol::Date)
 Permite comparar los datos a un vector obtenido a partir
@@ -187,21 +216,72 @@ será `Date(2020,3,3)` (un dato por cada día). Entonces,
 se espera que LossData haya sido creado con parámetro
 `tf = Date(2020,3,3)`.
 """
-function (f::LossData)(sol_vec, t0_sol::Date)
-  index_comparable = f.index_dias + cuantos_dias(t0_sol, f.t0)
+=#
+
+function (f::LossData3)(sol_vec, t0_sol::Date)
+  index_comparable = f.index_dias .+ cuantos_dias(t0_sol, f.t0)
   sum((sol_vec[index_comparable] - f.data).^2)
 end
 
+lossRep.index_dias
+cuantos_dias(t0_sol, lossRep.t0)
+estado_nI(sol_cuarentena)
 
-@time cuantos_datos_hasta_tf_sol(LossData(TS_UCI_SS_RM).dias, Date(2020,5,7))
+loss(sol_cuarentena, t0_sol, lossUCI, lossRep, lossDEIS)
+
+function estado_nI(sol)
+  - nuevos_diarios(sol, index_susc())
+end
+
+function estado_Hc(sol::DiffEqBase.DESolution)
+  sum(sol'[:, index_uci()], dims = 2)
+end
+
+function estado_nD(sol)
+    nuevos_diarios(sol, index_muertos())
+end
+
+
+function loss(sol::DiffEqBase.DESolution, t0_sol::Date,
+  lossUCI::LossData3, lossRep::LossData3, lossMuertos::LossData3)
+  is_failure(sol) && return Inf
+
+  un_dia = Dates.Day(1)
+
+  total = lossUCI(estado_Hc(sol), t0_sol) +
+    lossRep(estado_nI(sol), t0_sol + un_dia) +
+    lossMuertos(estadoMuertos(sol), t0_sol + un_dia)
+  total
+end
+
+lossUCI(estado_Hc(sol_cuarentena), t0_sol)
+
+Juno.@enter lossRep(estado_nI(sol_cuarentena), t0_sol)
+
+lossRep.index_dias
+lossRep.t0
+lossRep.data
+cuantos_dias(t0_sol, lossRep.t0)
+
+lossUCI = LossData3(TS_UCI_SS_RM, sol_cuarentena, t0_sol)
+lossRep = LossData3(TS_reportados_RM, sol_cuarentena, t0_sol)
+lossDEIS = LossData3(TS_DEIS_RM, sol_cuarentena, t0_sol)
+
+loss(sol_cuarentena, t0_sol, lossUCI, lossRep, lossDEIS)
+
+
+lossUCI(estado_Hc(sol_cuarentena), t0_sol)
+
+
 
 function (f::LossUCI2)(sol::DiffEqBase.DESolution)
   is_failure(sol) && return Inf
   # ARRREGLAR::::::::::::
   sum((estadoUCI(f.index_dias, sol) - f.data).^2)
 end
-function estadoUCI(t, sol)
-  sum(sol'[t, index_uci()], dims = 2)
+
+function estadoUCI(sol)
+  sum(sol'[:, index_uci()], dims = 2)
 end
 
 function (f::LossUCI)(sol::DiffEqBase.DESolution)
@@ -230,10 +310,6 @@ struct LossDEIS{T,D} <: DiffEqBase.DECostFunction
   data::D
 end
 
-function estadoDEIS(dias, sol)
-    nuevos_diarios(sol, index_muertos(),dias = dias + 1)
-end
-
 
 function (f::LossDEIS)(sol::DiffEqBase.DESolution)
   is_failure(sol) && return Inf
@@ -257,9 +333,7 @@ struct LossRep{T,D} <: DiffEqBase.DECostFunction
   data::D
 end
 
-function estadoRep(dias, sol)
-  - nuevos_diarios(sol, index_susc(),dias =  dias + 1)
-end
+
 
 
 function (f::LossRep)(sol::DiffEqBase.DESolution)
