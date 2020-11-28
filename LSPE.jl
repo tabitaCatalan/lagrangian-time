@@ -109,7 +109,7 @@ function is_failure(sol::DiffEqBase.DESolution)
   failure
 end
 
-############## UCI #################
+############## Estructura de Datos #################
 
 """
 Recibe un vector ordenado (creciente) de `Date`s, y devuelve un rango de las
@@ -139,7 +139,6 @@ index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(
 index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(2020,3,1), Date(2020,3,1))
 =#
 
-a = 1
 
 struct LossData3{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
   t0::D
@@ -164,11 +163,8 @@ struct LossData3{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
     new{Date,T,eltype(index_dias)}(t0,tf,dias[index_en_rango],data[index_en_rango],index_dias)
   end
 end
-lossRep = LossData3(TS_reportados_RM, sol_cuarentena, t0_sol)
 
-
-
-
+##### Constructor externos ######
 function LossData3(TS::TimeArray, t0_sol::Date, tf_sol::Date)
   dias = timestamp(TS)
   data = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS, dias[1],dias[end]))
@@ -176,14 +172,17 @@ function LossData3(TS::TimeArray, t0_sol::Date, tf_sol::Date)
   LossData3(dias,data,t0_sol, tf_sol)
 end
 
-
 function dia_final_sol(sol::DiffEqBase.DESolution, t0_sol::Date)
   n_dias = Integer(sol_cuarentena.t[end] - sol_cuarentena.t[1])
   tf_sol = t0_sol + Dates.Day(n_dias)
   tf_sol
 end
 
-t0_sol = Date(2020,3,17)
+function (f::LossData3)(sol_vec, t0_sol::Date)
+  index_comparable = f.index_dias .+ cuantos_dias(t0_sol, f.t0)
+  sum((sol_vec[index_comparable] - f.data).^2)
+end
+
 #=
 """
   LossData(sol_vec, t0_sol::Date)
@@ -214,16 +213,7 @@ se espera que LossData haya sido creado con parámetro
 """
 =#
 
-function (f::LossData3)(sol_vec, t0_sol::Date)
-  index_comparable = f.index_dias .+ cuantos_dias(t0_sol, f.t0)
-  sum((sol_vec[index_comparable] - f.data).^2)
-end
-
-lossRep.index_dias
-cuantos_dias(t0_sol, lossRep.t0)
-estado_nI(sol_cuarentena)
-
-loss(sol_cuarentena, t0_sol, lossUCI, lossRep, lossDEIS)
+######### Incorporar los datos ##########
 
 function estado_nI(sol)
   - nuevos_diarios(sol, index_susc())
@@ -250,105 +240,14 @@ function loss(sol::DiffEqBase.DESolution, t0_sol::Date,
   total
 end
 
-lossUCI(estado_Hc(sol_cuarentena), t0_sol)
-
-Juno.@enter lossRep(estado_nI(sol_cuarentena), t0_sol)
-
-lossRep.index_dias
-lossRep.t0
-lossRep.data
-cuantos_dias(t0_sol, lossRep.t0)
+################### Función de pérdida ########################
 
 lossUCI = LossData3(TS_UCI_SS_RM, sol_cuarentena, t0_sol)
 lossRep = LossData3(TS_reportados_RM, t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
 lossDEIS = LossData3(TS_DEIS_RM, t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
 
 
-loss(sol_cuarentena, t0_sol, lossUCI, lossRep, lossDEIS)
-
-
-
-
-function (f::LossUCI2)(sol::DiffEqBase.DESolution)
-  is_failure(sol) && return Inf
-  # ARRREGLAR::::::::::::
-  sum((estadoUCI(f.index_dias, sol) - f.data).^2)
-end
-
-function estadoUCI(sol)
-  sum(sol'[:, index_uci()], dims = 2)
-end
-
-function (f::LossUCI)(sol::DiffEqBase.DESolution)
-  is_failure(sol) && return Inf
-
-  sum((estadoUCI(f.t, sol) - f.data).^2)
-end
-
-construir_loss_UCI(TS_UCI_RM, t0, t1)
-
-function construir_loss_UCI(TS_UCI::TimeArray, t0::Date, t1::Date)
-  UCI_data_array = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS_UCI_RM, t0,t1))
-  lossUCI = LossData2(timestamp(TS_UCI_RM), UCI_data_array)
-  lossUCI
-end
-
-lossUCI = construir_loss_UCI(TS_UCI_RM, t0, t1)
-scatter(lossUCI.t, lossUCI.data, title = "Datos UCI", legend =:none)
-
-lossUCI(sol_cuarentena)
-
-########### Fallecidos ################
-
-struct LossDEIS{T,D} <: DiffEqBase.DECostFunction
-  dias::T
-  data::D
-end
-
-
-function (f::LossDEIS)(sol::DiffEqBase.DESolution)
-  is_failure(sol) && return Inf
-
-  sum(( estadoDEIS(f.dias, sol)- f.data).^2)
-end
-
-
-function construir_loss_DEIS(TS_DEIS::TimeArray, t0::Date, t1::Date)
-  DEIS_data_array = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS_DEIS_RM, t0, t1))
-  lossDEIS = LossDEIS(cuantos_dias(t0,t1), DEIS_data_array)
-  lossDEIS
-end
-
-lossDEIS = construir_loss_DEIS(TS_DEIS_RM, t0, t1)
-scatter(lossDEIS.data, title = "Datos DEIS")
-
-################## Reportados #####################
-struct LossRep{T,D} <: DiffEqBase.DECostFunction
-  dias::T
-  data::D
-end
-
-
-
-
-function (f::LossRep)(sol::DiffEqBase.DESolution)
-  is_failure(sol) && return Inf
-
-  sum(( estadoRep(f.dias, sol) - f.data).^2)
-end
-
-
-function construir_loss_rep(TS_rep::TimeArray, t0::Date, t1::Date)
-  reportados_data_array = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS_rep, t0, t1))
-  lossRep = LossRep(cuantos_dias(t0,t1), reportados_data_array)
-  lossRep
-end
-
-lossRep = construir_loss_rep(TS_reportados_RM, t0, t1)
-scatter(lossRep.data, title = "Datos Reportados")
-################### Total ########################
-
-loss(sol) = lossUCI(sol) + lossDEIS(sol) + lossRep(sol)
+loss_function = (sol) -> loss(sol, t0_sol, lossUCI, lossRep, lossDEIS)
 
 ####################################################
 ### Optimizar los parámetros                     ###
@@ -358,6 +257,7 @@ loss(sol) = lossUCI(sol) + lossDEIS(sol) + lossRep(sol)
 copy_data_u0 = copy(data_u0)
 prob_generator = (prob,p) -> remake(prob,u0 = update_initial_condition!(copy_data_u0, p), p=(p0_model_cte, p0_lmbda_cte))
 prob_generator_full = (prob,p) -> remake(prob,u0 = update_initial_condition!(copy_data_u0, p), p=(p[9:17],p[18:22]))
+
 function prob_generator_s0_beta(prob, p)
   p_vec[11] = p[2]
   remake(prob, u0 = update_initial_s0!(copy_data_u0, p[1]), p = (p_vec[1:9], p_vec[10:14]))
@@ -380,14 +280,13 @@ cost_function_full = build_loss_objective(prob_cuarentena,Tsit5(),
   )
 
 cost_function_s0_beta = build_loss_objective(prob_cuarentena,Tsit5(),
-  loss, prob_generator = prob_generator_s0_beta,
+  loss_function, prob_generator = prob_generator_s0_beta,
   saveat = saveat,
   maxiters = 10000
   )
 
 cost_function_full(p0)
 cost_function_full(p_10kiter)
-
 
 #function g!(G, x)
 #    G .=  cost_function'(x)
