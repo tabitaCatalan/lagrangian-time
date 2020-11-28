@@ -66,57 +66,59 @@ frac, times_frac= obtener_frac_cuarentena_from_csv(
 
 #TS_frac = TimeArray(times_frac, frac, [:T1, :T2, :T3])
 
-numero_dias = size(frac)[1]
 
-data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac)
+
+fecha0 = Date(2020, 3, 17)
+index0 = findfirst(isequal(fecha0), times_frac)
+
+data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac[index0:end,:], total_por_clase_censo)
+t_final = size(frac)[1] - index0
 
 #############################################
 # Definir parametros
 #############################################
-pᵢₘ = 0.4; pₑ = pᵢₘ/2; β = 3.;
-lambda_param = LambdaParam(1.0, β, pₑ, 1.0, pᵢₘ)
-
-dias = 10
-γₑ = 0.14; γᵢ = 1/dias; γᵢₘ = 1/dias;
-γₕ = 1/7; γₕ_c = 0.5;
-φₑᵢ = 0.1; φᵢᵣ = 0.9; φₕᵣ = 0.6; φ_d = 0.9;
-p = ModelParam(γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, lambda_param)
-p_vec = [γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, 1.0, β, pₑ, 1.0, pᵢₘ]
-
-tspan = (0.0,120.0)
-τ = 100. # tiempo de implementar medidas
-
-#s,e,im,i,r, h, hc, d = index_estados(n_clases)
-
-#=
-p2 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ,P_cuarentena)
-p3 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_normal)
-p4 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_trabajo_normal)
-p5 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_con_clases)
-p6 = set_up_parameters3(αₑ, αᵢₘ, β, β₂, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena)
-=#
+s,e,im,i,r, h, hc, d = index_estados(n_clases)
 output_folder = "..\\..\\img\\SEIIRHHD\\"
-filename = make_filename(p)
 extension = ".svg"
 
+begin
+    pᵢ = 0.75; pᵢₘ = 0.1125; pₑ = pᵢₘ/2; β = 3.5;
+    lambda_param = LambdaParam(1.0, β, pₑ, 1.0, pᵢₘ)
 
+    dias = 10
+    γₑ = 1/5; γᵢ = 1/dias; γᵢₘ = 1/dias;
+    γₕ = 1/6; γₕ_c = 1/10;
+    φₑᵢ = 0.5; φᵢᵣ = 0.85; φₕᵣ = 0.85; φ_d = 0.1;
+    p = ModelParam(γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, lambda_param)
+    p_vec = [γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, 1.0, β, pₑ, 1.0, pᵢₘ]
+
+    tspan = (0.0,t_final)
+    #τ = 100. # tiempo de implementar medidas
+
+
+    #=
+    p2 = set_up_parameters(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ,P_cuarentena)
+    p3 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_normal)
+    p4 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_trabajo_normal)
+    p5 = set_up_parameters2(αₑ, αᵢₘ, β, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena, P_con_clases)
+    p6 = set_up_parameters3(αₑ, αᵢₘ, β, β₂, γₑ, φ, γᵢ, γᵢₘ, τ,P_cuarentena)
+    =#
+    filename = make_filename(p)
+end
 ### Resolver
 save_at = 1.
 
-prob_cuarentena = ODEProblem(seiirhhd!,data_u0,tspan,p_vec)
+prob_cuarentena = ODEProblem(seiirhhd!,data_u0,tspan,(p_vec[1:9],p_vec[10:14]))
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at);
+
+plot_comparar_datos(sol_cuarentena)
+plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
+plot_comparar_datos(sol_cuarentena)
 
 prob_normal = ODEProblem(seiirhhd!,data_u0,tspan,p_vec)
 sol_normal = solve(prob_normal, saveat = save_at);
 
-sol_normal.t
-tspan
-
-prob2 = remake(prob_cuarentena, p = p_vec)
-sol2 = solve(prob2)
-
-length(sol2.t)
-a= 1
+a = 1
 #=
 prob_cuarentena = remake(prob_normal; p = p2)
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
@@ -125,7 +127,7 @@ sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
 
 #plot_all_states(sol_normal, n_clases, nombre_clases; indexs = joven)
 
-#=
+
 plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
 
 
@@ -161,7 +163,7 @@ plot_nuevos_contagios(
     labels = ["Cuarentena siempre" "Retomar clases en t=$τ" "Vuelta al trabajo en t=$τ" "Eliminar mascarillas en t=$τ"];
     title = "Contagios diarios")
 savefig(output_folder*"comparar_nuevos_contagios2456"*filename*extension)
-=#
+
 #=
 plot_nuevos_contagios(
     [sol_normal, sol_cuarentena],

@@ -111,7 +111,16 @@ end
 minsal_folder = "C:\\Users\\Tabita\\Documents\\Covid\\Datos-COVID19-MINSAL\\output\\"
 DEIS_data = "producto50\\DefuncionesDEISPorComuna_T.csv"
 reportados_data = "producto26\\CasosNuevosConSintomas_T.csv"
-UCI_data = "producto48\\SOCHIMI_T.csv"
+UCI_data_SS = "producto48\\SOCHIMI_T.csv"
+UCI_data = "producto8\\UCI_T.csv"
+
+TS_UCI = TimeArray(CSV.File( minsal_folder * UCI_data,
+    header = 2, datarow = 4
+    ), timestamp = Symbol("Codigo region")
+)
+
+TS_UCI_RM = TS_UCI[Symbol("13")]
+timestamp(TS_UCI_RM)[end]
 
 TS_DEIS = TimeArray(CSV.File(minsal_folder * DEIS_data,
         header = 4, datarow = 6,
@@ -127,10 +136,16 @@ TS_reportados = TimeArray(
 )
 TS_reportados_RM = TS_reportados[Symbol("Metropolitana")]
 
-TS_UCI = TimeArray(
-    CSV.File(minsal_folder * UCI_data,
+TS_UCI_SS = TimeArray(
+    CSV.File(minsal_folder * UCI_data_SS,
         header = 3:4, datarow = 5
     ), timestamp = Symbol("Servicio salud_Serie")
 )
 
-TS_UCI_RM = TS_UCI[cols_c19_RM(TS_UCI)]
+TS_UCI_SS_RM = TS_UCI_SS[cols_c19_RM(TS_UCI_SS)]
+#=
+TS_UCI_Vis = TimeArray(
+    CSV.File( "..\\..\\data\\PacientesCovid-19UCIanivel_Visualizador.csv",
+        transpose=true,
+    ), timestamp = Symbol("nombre")
+)=#

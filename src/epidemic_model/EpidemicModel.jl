@@ -28,7 +28,9 @@ struct MyDataArray{T} <: DEDataArray{T,1}
     P_normal::Array{T,2}
     P_cuarentena::Array{T,2}
     frac_pobla_cuarentena::Array{T,2}
+    total_por_clase::Array{T}
 end
+
 
 """
     LambdaParam
@@ -179,6 +181,10 @@ function make_model_param(p)
   ModelParam(p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], LambdaParam(p[10], p[11], p[12], p[13], p[14]))
 end
 
+function make_model_param(p_mod, p_lb)
+    ModelParam(p_mod[1], p_mod[2], p_mod[3], p_mod[4], p_mod[5], p_mod[6], p_mod[7], p_mod[8], p_mod[9], LambdaParam(p_lb[1], p_lb[2], p_lb[3], p_lb[4], p_lb[5]))
+end
+
 """
     seiirhhd!(du,u,p,t)
 Modelo epidemiológico tipo SEIIRHHD
@@ -188,9 +194,9 @@ Modelo epidemiológico tipo SEIIRHHD
 - `p::ModelParam`
 - `t`:
 """
-function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p_vec::Vector{Float64},t)
+function seiirhhd!(du,u,p_vec,t)
     # Extraer parametros
-    p = make_model_param(p_vec)
+    p = make_model_param(p_vec[1], p_vec[2])
     γₑ = p.gamma_e; γᵢ = p.gamma_i; γᵢₘ = p.gamma_im
     γₕ = p.gamma_h; γₕ_c = p.gamma_hc
     φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d
@@ -209,6 +215,7 @@ function seiirhhd!(du::MyDataArray{Float64},u::MyDataArray{Float64},p_vec::Vecto
     du.x.Hc = (1.0 - φₕᵣ) * γₕ * u.x.H - φ_d * γₕ_c * u.x.Hc
     du.x.D = φ_d * γₕ_c * u.x.Hc
 end;
+
 
 """
     calcular_lambda!(λ, lambda_param::LambdaParam, P, u::MyDataArray)
@@ -269,14 +276,14 @@ Crea un vector por componentes con las condiciones iniciales.
 """
 function set_up_inicial_conditions(total_por_clase)
     n_clases = length(total_por_clase)
-    e0 = 10.0*ones(n_clases)
-    i0 = zeros(n_clases) #10*ones(n_clases)
-    im0 = zeros(n_clases) #100*ones(n_clases)
-    s0 = total_por_clase - e0
+    e0 = (129/n_clases)*ones(n_clases)
+    i0 = (174/n_clases)*zeros(n_clases) #10*ones(n_clases)
+    im0 = (1799/n_clases)*zeros(n_clases) #100*ones(n_clases)
     r0 = zeros(n_clases)
-    h0 = zeros(n_clases)
-    hc0 = zeros(n_clases)
+    h0 = (40/n_clases)*zeros(n_clases)
+    hc0 = (4/n_clases)*zeros(n_clases)
     d0 = zeros(n_clases)
+    s0 = total_por_clase - e0
 
     u0 = ComponentArray(S = s0, E = e0, Im = im0, I = i0, R = r0, H = h0, Hc = hc0, D = d0)
     return u0
@@ -335,6 +342,8 @@ end
 
 function get_riesgos()
     return [0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
+    # Version con numero de contactos
+    # [1, 10, 30, 20, 5, 10, 40, 50, 80, 2, 2, 2, 5]
 end
 
 function get_riesgos!(beta)
