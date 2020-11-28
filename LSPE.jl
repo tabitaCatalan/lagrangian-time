@@ -117,7 +117,7 @@ fechas que están en [t0,tf].
 """
 function index_dias_entre_t0_y_tf(dias::Vector{Date}, t0::Date, tf::Date)
   if t0 > tf
-    error("t0 debe ser una fecha anterior que tf. Entrgó t0 = $t0 y tf = $tf.")
+    error("t0 debe ser una fecha anterior que tf. Entregó t0 = $t0 y tf = $tf.")
   end
   primero = findfirst(dias .>= t0)
   ultimo = findlast(dias .<= tf)
@@ -393,9 +393,11 @@ opt_pro_full
 
 
 opt_s0_beta = bbsetup(cost_function_s0_beta; SearchRange = [(0.0, 1.0), (0.5, 4.0)]);
-res_s0_beta = bboptimize(opt_s0_beta, MaxSteps=10000)
+res_s0_beta = bboptimize(opt_s0_beta, MaxSteps=100000)
 
 
+prob_s0_beta = prob_generator_s0_beta(prob_cuarentena, res_s0_beta.archive_output.best_candidate)
+sol_s0_beta = solve(prob_s0_beta, saveat =saveat)
 
 prob_ini = prob_generator(prob_cuarentena,p0)
 sol_ini = solve(prob_ini, saveat = 1.0)
@@ -467,20 +469,23 @@ sum(values(TS_UCI_RM[colnames(TS_UCI_RM)[1:6]]), dims = 2)[1]
 sum(values(TS_UCI_RM[colnames(TS_UCI_RM)[7:12]]), dims = 2)[1]
 
 
-function plot_comparar_datos(sol)
-  fechas_sol = times_frac[index0:end]
+function plot_comparar_datos(sol, t0_sol)
+  fechas_sol = t0_sol:Dates.Day(1):dia_final_sol(sol, t0_sol)
 
-  plot1 = plot(fechas_sol[2:end], preparar_para_comparar_reportados(sol, fechas_sol[1], fechas_sol[end]), title = "Reportados")
-  scatter!(plot1, fechas_datos, lossRep.data)
+  plot1 = plot(fechas_sol[2:end], estado_nI(sol), title = "Reportados")
+  scatter!(plot1, lossRep.dias, lossRep.data)
 
-  plot2 = plot(fechas_sol[2:end], preparar_para_comparar_UCI(sol, fechas_sol[1], fechas_sol[end]), title = "UCI" )
-  scatter!(plot2, fechas_datos[lossUCI.t[1:end-1]], lossUCI.data[1:end-1])
+  plot2 = plot(fechas_sol, estado_Hc(sol), title = "UCI" )
+  scatter!(plot2, lossUCI.dias, lossUCI.data)
 
-  plot3 = plot(fechas_sol[2:end], preparar_para_comparar_DEIS(sol,fechas_sol[1], fechas_sol[end]), title = "Fallecidos")
-  scatter!(plot3,fechas_datos, lossDEIS.data)
+  plot3 = plot(fechas_sol[2:end], estado_nD(sol), title = "Fallecidos")
+  scatter!(plot3,lossDEIS.dias, lossDEIS.data)
 
   plot(plot1, plot2, plot3, layout = (1,3))
 end
+
+t0_sol
+plot_comparar_datos(sol_cuarentena, t0_sol)
 
 fechas = fechas_sol[1:cuantos_dias(t0,t1)]
 length(fechas)
