@@ -107,13 +107,23 @@ end
 
 ############## UCI #################
 
+"""
+Recibe un vector ordenado (creciente) de `Date`s, y devuelve cuántos de ellos
+son iguales o anteriores a la fecha `tf`.
+"""
+function cuantos_datos_hasta_tf_sol(dias::Vector{Date}, tf::Date)
+  findfirst(dias .> tf) - 1
+end
+
+
 struct LossData{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
   t0::D
+  tf::D
   dias::Vector{D}
   data::Vector{T}
   index_dias::Vector{I}
 
-  function LossData(dias::Vector{Date}, data::Vector{T}) where {T<:Real}
+  function LossData(dias::Vector{Date}, data::Vector{T}, tf_sol::Date) where {T<:Real}
     if length(data) != length(dias)
       error("Los vectores `dias` y `data` deben ser del mismo largo.")
     end
@@ -122,39 +132,68 @@ struct LossData{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
     full_index = collect(1:length(full_dias))
     is_in(dias, full_dias)
     index_dias = full_index[is_in(full_dias, dias)]
-    new{Date,T,eltype(index_dias)}(t0,dias,data,index_dias)
+
+    n_datos = cuantos_datos_hasta_tf_sol(dias, tf_sol)
+
+    tf = dias[n_datos]
+    new{Date,T,eltype(index_dias)}(t0,tf,dias[1:n_datos],data[1:n_datos],index_dias[1:n_datos])
   end
 end
 
-
-LossData([Date(2020,3,4), Date(2020, 3,6)], [4.5, 6.7])
-
-
-function LossData(TS::TimeArray)
+function LossData(TS::TimeArray, tf_sol::Date)
   dias = timestamp(TS)
   data = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS, dias[1],dias[end]))
 
-  LossData(dias,data)
+  LossData(dias,data, tf_sol)
 end
 
-LossData(TS_UCI_SS_RM)
+function LossData(TS::TimeArray, sol::DiffEqBase.DESolution)
+  n_dias = Integer(sol_cuarentena.t[end] - sol_cuarentena.t[1]) + 1
+  tf_sol = t0_sol + Dates.Day(n_dias) - 1
+  LossData(TS, tf_sol)
+end
+
+Integer(sol_cuarentena.t[end])
 
 
-1 != 3
-dias = timestamp(TS_DEIS_RM)
-suma_por_fila_y_filtrar_fecha(TS_DEIS_RM, dias[1],dias[end])
-drop_missing_and_vectorize()
-TS_DEIS_RM_data_array = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS_DEIS_RM, dias[1],dias[end]))
-LossData5(timestamp(TS_DEIS_RM), TS_DEIS_RM_data_array)
+LossData(TS_UCI_SS_RM, Date(2020,7,1))
 
-Vector{Date} <: Array{Date,1}
+sol_cuarentena
 
-LossData3(t0, index_dias, dias, data)
+"""
+  LossData(sol_vec, t0_sol::Date)
+Permite comparar los datos a un vector obtenido a partir
+de la solución a una ecuación diferencial.
+# Argumentos
+- `sol_vec::Vector` es un vector de datos obtenidos a
+  partir de la solución. Puede ser, por ejemplo, el
+  número de nuevos casos diarios, el total de infectados
+  por día, etc. Suponemos que es un vector guardado cada
+  un día (es decir, que al usar `solve` se tenía un
+  `saveat = 1.0`), de manera consecutiva (es una solución
+  completa o parte de la solución, sin saltarse datos).
+- `t0_sol`: fecha a la que corresponde el primer día de
+  `sol_vec`. Se espera que sea anterior a la fecha `t0`
+  de `LossData`.
+# Consideraciones
+Se espera que la cantidad de datos sea consistente con
+LossData; específicamente, que al calcular la fecha
+final de la solución, esta coincida con el parámetro
+`tf` de `LossData`. Por ejemplo, si la solución se
+calculó con parámetro `tspan = (0.0,2.0)`, esto sumado al
+`saveat = 1.0` nos da un total de 3 datos. Luego, si
+`t0_sol = Date(2020,3,1)`, el día final de la solución
+será `Date(2020,3,3)` (un dato por cada día). Entonces,
+se espera que LossData haya sido creado con parámetro
+`tf = Date(2020,3,3)`.
+"""
+function (f::LossData)(sol_vec, t0_sol::Date)
+  index_comparable = f.index_dias + cuantos_dias(t0_sol, f.t0)
+  sum((sol_vec[index_comparable] - f.data).^2)
+end
 
-TimeArray
-TS_reportados.
 
-
+@time cuantos_datos_hasta_tf_sol(LossData(TS_UCI_SS_RM).dias, Date(2020,5,7))
 
 function (f::LossUCI2)(sol::DiffEqBase.DESolution)
   is_failure(sol) && return Inf
