@@ -176,10 +176,6 @@ function LossData3(TS::TimeArray, t0_sol::Date, tf_sol::Date)
   LossData3(dias,data,t0_sol, tf_sol)
 end
 
-function LossData3(TS::TimeArray, sol::DiffEqBase.DESolution, t0_sol::Date)
-  tf_sol = dia_final_sol(sol, t0_sol)
-  LossData3(TS, t0_sol, tf_sol)
-end
 
 function dia_final_sol(sol::DiffEqBase.DESolution, t0_sol::Date)
   n_dias = Integer(sol_cuarentena.t[end] - sol_cuarentena.t[1])
@@ -250,7 +246,7 @@ function loss(sol::DiffEqBase.DESolution, t0_sol::Date,
 
   total = lossUCI(estado_Hc(sol), t0_sol) +
     lossRep(estado_nI(sol), t0_sol + un_dia) +
-    lossMuertos(estadoMuertos(sol), t0_sol + un_dia)
+    lossMuertos(estado_nD(sol), t0_sol + un_dia)
   total
 end
 
@@ -264,13 +260,12 @@ lossRep.data
 cuantos_dias(t0_sol, lossRep.t0)
 
 lossUCI = LossData3(TS_UCI_SS_RM, sol_cuarentena, t0_sol)
-lossRep = LossData3(TS_reportados_RM, sol_cuarentena, t0_sol)
-lossDEIS = LossData3(TS_DEIS_RM, sol_cuarentena, t0_sol)
+lossRep = LossData3(TS_reportados_RM, t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
+lossDEIS = LossData3(TS_DEIS_RM, t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
+
 
 loss(sol_cuarentena, t0_sol, lossUCI, lossRep, lossDEIS)
 
-
-lossUCI(estado_Hc(sol_cuarentena), t0_sol)
 
 
 
