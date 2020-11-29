@@ -140,14 +140,14 @@ index_dias_entre_t0_y_tf([Date(2020,3,2), Date(2020,3,4), Date(2020,3,6)], Date(
 =#
 
 
-struct LossData3{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
+struct LossData{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
   t0::D
   tf::D
   dias::Vector{D}
   data::Vector{T}
   index_dias::Vector{I}
 
-  function LossData3(dias::Vector{Date}, data::Vector{T}, t0_sol::Date, tf_sol::Date) where {T<:Real}
+  function LossData(dias::Vector{Date}, data::Vector{T}, t0_sol::Date, tf_sol::Date) where {T<:Real}
     if length(data) != length(dias)
       error("Los vectores `dias` y `data` deben ser del mismo largo.")
     end
@@ -165,11 +165,11 @@ struct LossData3{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
 end
 
 ##### Constructor externos ######
-function LossData3(TS::TimeArray, t0_sol::Date, tf_sol::Date)
+function LossData(TS::TimeArray, t0_sol::Date, tf_sol::Date)
   dias = timestamp(TS)
   data = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS, dias[1],dias[end]))
 
-  LossData3(dias,data,t0_sol, tf_sol)
+  LossData(dias,data,t0_sol, tf_sol)
 end
 
 function dia_final_sol(sol::DiffEqBase.DESolution, t0_sol::Date)
@@ -178,9 +178,9 @@ function dia_final_sol(sol::DiffEqBase.DESolution, t0_sol::Date)
   tf_sol
 end
 
-function (f::LossData3)(sol_vec, t0_sol::Date)
+function (f::LossData)(sol_vec, t0_sol::Date)
   index_comparable = f.index_dias .+ cuantos_dias(t0_sol, f.t0)
-  sum((sol_vec[index_comparable] - f.data).^2)
+  sum((log.(sol_vec[index_comparable]) - log.(f.data)).^2)
 end
 
 #=
@@ -229,7 +229,7 @@ end
 
 
 function loss(sol::DiffEqBase.DESolution, t0_sol::Date,
-  lossUCI::LossData3, lossRep::LossData3, lossMuertos::LossData3)
+  lossUCI::LossData, lossRep::LossData, lossMuertos::LossData)
   is_failure(sol) && return Inf
 
   un_dia = Dates.Day(1)
@@ -241,14 +241,16 @@ function loss(sol::DiffEqBase.DESolution, t0_sol::Date,
 end
 
 ################### Función de pérdida ########################
+t0_sol = Date(2020,3,17)
+lossUCI = LossData(TS_UCI_RM[15:end], t0_sol, dia_final_sol(sol_cuarentena, t0_sol))
+lossRep = LossData(TS_reportados_RM[30:end], t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
+lossDEIS = LossData(TS_DEIS_RM, t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
 
-lossUCI = LossData3(TS_UCI_SS_RM, sol_cuarentena, t0_sol)
-lossRep = LossData3(TS_reportados_RM, t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
-lossDEIS = LossData3(TS_DEIS_RM, t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
 
-
+data_u0[index_muertos()]
 loss_function = (sol) -> loss(sol, t0_sol, lossUCI, lossRep, lossDEIS)
 
+loss_function(sol_cuarentena)
 ####################################################
 ### Optimizar los parámetros                     ###
 ### Requiere haber corrido run_model_and_plot.jl ###
@@ -393,8 +395,8 @@ opt_pro_full
 
 
 opt_s0_beta = bbsetup(cost_function_s0_beta; SearchRange = [(0.0, 1.0), (0.5, 4.0)]);
-res_s0_beta = bboptimize(opt_s0_beta, MaxSteps=100000)
-
+res_s0_beta = bboptimize(opt_s0_beta, MaxSteps=50000)
+# =  [0.02650813261750469, 0.5010702132371551]
 
 prob_s0_beta = prob_generator_s0_beta(prob_cuarentena, res_s0_beta.archive_output.best_candidate)
 sol_s0_beta = solve(prob_s0_beta, saveat =saveat)
@@ -472,14 +474,14 @@ sum(values(TS_UCI_RM[colnames(TS_UCI_RM)[7:12]]), dims = 2)[1]
 function plot_comparar_datos(sol, t0_sol)
   fechas_sol = t0_sol:Dates.Day(1):dia_final_sol(sol, t0_sol)
 
-  plot1 = plot(fechas_sol[2:end], estado_nI(sol), title = "Reportados")
-  scatter!(plot1, lossRep.dias, lossRep.data)
+  plot1 = plot(fechas_sol[2:end], log.(estado_nI(sol)), title = "Reportados")
+  scatter!(plot1, lossRep.dias, log.(lossRep.data))
 
-  plot2 = plot(fechas_sol, estado_Hc(sol), title = "UCI" )
-  scatter!(plot2, lossUCI.dias, lossUCI.data)
+  plot2 = plot(fechas_sol, log.(estado_Hc(sol)), title = "UCI" )
+  scatter!(plot2, lossUCI.dias, log.(lossUCI.data))
 
-  plot3 = plot(fechas_sol[2:end], estado_nD(sol), title = "Fallecidos")
-  scatter!(plot3,lossDEIS.dias, lossDEIS.data)
+  plot3 = plot(fechas_sol[2:end], log.(estado_nD(sol)), title = "Fallecidos")
+  scatter!(plot3,lossDEIS.dias, log.(lossDEIS.data))
 
   plot(plot1, plot2, plot3, layout = (1,3))
 end
