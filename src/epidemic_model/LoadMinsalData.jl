@@ -107,17 +107,62 @@ function cols_c19_RM(TS_data::TimeArray)
     filter(col -> es_SS_METRO(col) & (es_vmi_c19_sosp(col) | es_vmi_c19_confi(col)), colnames(TS_data))
 end
 
+function condensar_por_edad_sexo(TS_GE::TimeArray, TS_rep::TimeArray)
+    
+    frac_rep_RM_del_total = (TS_rep[Symbol("Metropolitana")] ./ TS_rep[Symbol("Total")])[2:end]
+
+    t0 = max(timestamp(TS_GE)[1], timestamp(frac_rep_RM_del_total)[1])
+    tf = min(timestamp(TS_GE)[end], timestamp(frac_rep_RM_del_total)[end])
+    
+    tiempos_validos = timestamp(TS_GE[t0:Dates.Day(1):tf])
+
+    TS_GE_corta = TS_GE[tiempos_validos]
+    TS_frac_corta = frac_rep_RM_del_total[tiempos_validos]
+
+    joven = 1:5; adulto = 6:13; mayor = 14:17
+    hombre = 0; mujer = 1
+
+    get_index(edad,sexo) = sexo*17 .+ edad
+    
+    col_names = colnames(TS_GE_corta)
+    Nt = length(timestamp(TS_GE_corta))
+    condensed = Array{Int64, 2}(undef, Nt, 6)
+    Str_edad = ["Joven", "Adulto", "Mayor"]
+    Str_sexo = ["M", "F"]
+    col_names_condensed = Vector{String}(undef, 6)
+    edades = (joven, adulto, mayor)
+    sexos =  (hombre, mujer)
+    for i in 1:3, j in 1:2
+        clase = 2*(i-1) + j
+        condensed[:,clase] =  sum(values(TS_GE_corta[col_names[get_index(edades[i], sexos[j])]]), dims = 2)
+        println("Edad: ", edades[i], ", Sexo:", sexos[j])
+        col_names_condensed[clase] = Str_sexo[j] * Str_edad[i]
+    end 
+
+    condensed_reescaled = condensed .* values(TS_frac_corta)
+
+    TS_condensed = TimeArray(timestamp(TS_GE), condensed_reescaled, col_names_condensed)
+
+    TS_condensed
+end
+
 
 minsal_folder = "C:\\Users\\Tabita\\Documents\\Covid\\Datos-COVID19-MINSAL\\output\\"
 DEIS_data = "producto50\\DefuncionesDEISPorComuna_T.csv"
 reportados_data = "producto26\\CasosNuevosConSintomas_T.csv"
 UCI_data_SS = "producto48\\SOCHIMI_T.csv"
 UCI_data = "producto8\\UCI_T.csv"
+GE_data = "producto16\\CasosGeneroEtario_T.csv"
 
-TS_UCI = TimeArray(CSV.File( minsal_folder * UCI_data,
-    header = 2, datarow = 4
-    ), timestamp = Symbol("Codigo region")
+TS_GE = TimeArray(CSV.File( minsal_folder * GE_data,
+    header = 1:2, datarow = 3),
+    timestamp = Symbol("Grupo de edad_Sexo")
 )
+TS_edad_sexo = condensar_por_edad_sexo(TS_GE, TS_reportados)
+
+
+TS_UCI = TimeArray(CSV.File( minsal_folder * UCI_data, header = 2, datarow = 4),
+    timestamp = Symbol("Codigo region"))
 
 TS_UCI_RM = TS_UCI[Symbol("13")]
 timestamp(TS_UCI_RM)[end]
@@ -134,7 +179,7 @@ TS_reportados = TimeArray(
     CSV.File(minsal_folder * reportados_data),
     timestamp = Symbol("Region")
 )
-TS_reportados_RM = TS_reportados[Symbol("Metropolitana")]
+
 
 TS_UCI_SS = TimeArray(
     CSV.File(minsal_folder * UCI_data_SS,
