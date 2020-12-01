@@ -217,37 +217,62 @@ se espera que LossData haya sido creado con parámetro
 ######### Incorporar los datos ##########
 
 function estado_nI(sol)
-  - nuevos_diarios(sol, index_susc())
+  φₑᵢ = sol.prob.p.phi_ei
+  -  φₑᵢ * nuevos_diarios(sol, index_susc())
+end
+
+function estado_cI(sol)
+  φₑᵢ = sol.prob.p.phi_ei
+  S0 = sum(sol'[1, index_susc()])
+  φₑᵢ * (S0 .- sum(sol'[:, index_susc()], dims = 2))
 end
 
 function estado_Hc(sol::DiffEqBase.DESolution)
   sum(sol'[:, index_uci()], dims = 2)
 end
 
-function estado_nD(sol)
-    nuevos_diarios(sol, index_muertos())
+function estado_cHc(sol::DiffEqBase.DESolution)
+  cumsum(estado_Hc(sol), dims = 1)
+end
+
+function estado_D(sol)
+  sum(sol'[:, index_muertos()], dims = 2)
 end
 
 
 function loss(sol::DiffEqBase.DESolution, t0_sol::Date,
-  lossUCI::LossData, lossRep::LossData, lossMuertos::LossData)
+  lossCumUCI::LossData, lossCumRep::LossData, lossCumD::LossData; chi = 1.0 )
   is_failure(sol) && return Inf
 
   un_dia = Dates.Day(1)
 
-  total = lossUCI(estado_Hc(sol), t0_sol) +
-    lossRep(estado_nI(sol), t0_sol + un_dia) +
-    lossMuertos(estado_nD(sol), t0_sol + un_dia)
+  total = lossCumUCI(estado_cHc(sol), t0_sol) +
+    chi * lossCumRep(estado_cI(sol), t0_sol) +
+    lossCumD(estado_D(sol), t0_sol)
   total
 end
 
 ################### Función de pérdida ########################
-t0_sol = Date(2020,3,17)
-lossUCI = LossData(TS_UCI_RM[15:end], t0_sol, dia_final_sol(sol_cuarentena, t0_sol))
-lossRep = LossData(TS_reportados_RM[30:end], t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
-lossDEIS = LossData(TS_DEIS_RM[20:end], t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
+function acumulados_desde(TS::TimeArray; i0 = 1)
+  cumsum(TS[i0:end], dims = 1)
+end
 
-loss_function = (sol) -> loss(sol, t0_sol, lossUCI, lossRep, lossDEIS)
+
+t0_sol = Date(2020,3,17)
+lossCumUCI = LossData(acumulados_desde(TS_UCI_RM, i0=15), t0_sol,
+  dia_final_sol(sol_cuarentena, t0_sol))
+lossCumRep = LossData(acumulados_desde(TS_reportados_RM,i0=30),
+  t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
+lossCumDEIS = LossData(acumulados_desde(TS_DEIS_RM,i0=20),
+  t0_sol, dia_final_sol(sol_cuarentena, t0_sol))
+
+
+loss_function_reducedRep(sol_cuarentena)
+
+loss_function_reducedRep = (sol) -> loss(sol, t0_sol,
+  lossCumUCI, lossCumRep, lossCumDEIS,
+  chi = 0.05)
+
 
 ####################################################
 ### Optimizar los parámetros                     ###
@@ -281,6 +306,16 @@ function prob_generator_s0_beta(prob, p)
   remake(prob, u0 = update_initial_s0!(copy_data_u0, p[1]), p = (p_vec[1:9], p_vec[10:14]))
 end
 
+function prob_gen_onlyopt(prob,p)
+  s0 = p[1]
+
+  φₑᵢ = 0.5; φᵢᵣ = 0.85; φₕᵣ = 0.85; φ_d = 0.1;
+  pᵢ = 0.75; pᵢₘ = 0.75pᵢ; pₑ = 0.5pᵢₘ
+  p_model = ModelParam(p[2], p[3], p[4], p[5], p[6], φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, LambdaParam(1.0, p[7], pₑ, pᵢ , pᵢₘ))
+
+  remake(prob, u0 = update_initial_s0!(copy_data_u0, s0), p = p_model)
+end
+
 saveat = 1.0
 cost_function = build_loss_objective(prob_cuarentena,Tsit5(),
   loss_function, prob_generator = prob_generator,
@@ -294,8 +329,21 @@ cost_function_full = build_loss_objective(prob_cuarentena,Tsit5(),
   maxiters = 10000
   )
 
+cost_function_full_reducedRep = build_loss_objective(prob_cuarentena,Tsit5(),
+  loss_function_reducedRep, prob_generator = prob_generator_full,
+  saveat = saveat,
+  maxiters = 10000
+  )
+
+
 cost_function_s0_beta = build_loss_objective(prob_cuarentena,Tsit5(),
   loss_function, prob_generator = prob_generator_s0_beta,
+  saveat = saveat,
+  maxiters = 10000
+  )
+
+cost_function_onlyopt = build_loss_objective(prob_cuarentena,Tsit5(),
+  loss_function_reducedRep, prob_generator = prob_gen_onlyopt,
   saveat = saveat,
   maxiters = 10000
   )
@@ -309,30 +357,28 @@ cost_function_full(p_10kiter)
 #u0_params = [s0, e0, i0, im0, r0, h0, hc0, d0]
 #sum(u0_params)
 lower_u0 = [0., 0., 0., 0., 0., 0., 0., 0.]
-upper_u0 = [0.6, 0.01, 0.01, 0.01, 0.01, 0.01, 0.001, 0.]
+upper_u0 = [0.9, 0.01, 0.01, 0.01, 0.01, 0.01, 0.001, 0.]
 
 #const p0_model_cte = p0_model
 #p0_model =    [γₑ,    γᵢ,   γᵢₘ,  γₕ,    γₕ_c,  φₑᵢ, φᵢᵣ, φₕᵣ, φ_d]
-lower_model = [1/6,  1/14, 1/14,  1/10,  1/16, 0.5, 0.85, 0.85, 0.1]
-upper_model = [1/4,   1/7,  1/7,   1/2,  1/7,  0.5, 0.85, 0.85, 0.1]
+lower_model = [1/6,  1/14, 1/14,  1/10,  1/16] #, 0.5, 0.85, 0.85, 0.1]
+upper_model = [1/4,   1/7,  1/7,   1/2,  1/7] #  0.5, 0.85, 0.85, 0.1]
 
 #const p0_lmbda_cte = p0_lmbda
-#p0_lmbda = [1.0, β, pₑ, 1.0, pᵢₘ]
-lower_lmbda = [1.0, 0.1, 0.0, 0.6, 0.6]
-upper_lmbda = [1.0, 6.0, 0.2, 0.9, 0.9]
+#p0_lmbda = [1.0, β, pₑ, 1.0, pᵢₘ] saqué el alfa!
+lower_lmbda = [0.1, 0.0, 0.6, 0.6]
+upper_lmbda = [6.0, 0.2, 0.9, 0.9]
 
 
 #p0 = [u0_params;p0_model; p0_lmbda]
-lower = [lower_u0; lower_model; lower_lmbda]
-upper = [upper_u0; upper_model; upper_lmbda]
+lower = [0.3; lower_model; 0.1]
+upper = [0.9; upper_model; 6.0]
 
 prob_ini = prob_generator_full(prob_cuarentena, (lower + upper)/2)
 sol_ini = solve(prob_ini, saveat = 1.0)
 plot_comparar_datos(sol_ini, t0_sol)
 
-cost_function_full((lower + upper)/2)
-
-
+cost_function_onlyopt(upper)
 
 using BlackBoxOptim
 #=
@@ -349,13 +395,24 @@ p_10kiter_3 = [0.217294, 0.00686224, 0.000444803, 0.0239579, 0.626459, 0.0006902
 
 p_50kiter = [0.0969546, 0.146413, 1.09846e-5, 0.104801, 0.297526, 0.00555738, 1.22076e-6, 0.0309135, 0.0103015, 0.0101211, 0.656864, 0.369947, 1.14764, 0.290392, 0.0103027, 0.98965, 0.00207951, 0.521254, 4.79618, 7.40387e-6, 0.944759, 7.03487e-5]
 =#
-
+### Problema Full parametros, Loss iguales
 opt_pro_full = bbsetup(cost_function_full; SearchRange = (i -> (lower[i], upper[i])).(1:22));
-
 res_full = bboptimize(opt_pro_full, MaxSteps=5000000)
-
-prob_full_opt = prob_generator_full(prob_cuarentena, res_full.archive_output.best_candidate)
+prob_full_opt = prob_generator_full(prob_cuarentena,res_full.archive_output.best_candidate)
 sol_full = solve(prob_full_opt, saveat =saveat)
+
+### Problema Full parametros, Loss reducida en los Reportados
+opt_pro_onlyopt = bbsetup(cost_function_onlyopt; SearchRange = (i -> (lower[i], upper[i])).(1:7));
+res_onlyopt = bboptimize(opt_pro_onlyopt, MaxSteps=5000000)
+prob_onlyopt = prob_generator_full(prob_cuarentena, res_onlyopt.archive_output.best_candidate)
+sol_onlyopt = solve(prob_onlyopt, saveat =saveat)
+plot_comparar_datos(sol_onlyopt, t0_sol)
+
+cost_function_onlyopt(res_onlyopt.archive_output.best_candidate)
+
+
+
+
 
 plot_comparar_datos(sol_full, t0_sol)
 
@@ -458,19 +515,22 @@ sum(values(TS_UCI_RM[colnames(TS_UCI_RM)[7:12]]), dims = 2)[1]
 
 plot1 = plot_comparar_datos(sol_full, t0_sol)
 
-(plot1.subplots[1])
+
+plot_comparar_datos(sol_cuarentena, t0_sol, scale = :log10)
+
+
 
 function plot_comparar_datos(sol, t0_sol; scale = :identity)
   fechas_sol = t0_sol:Dates.Day(1):dia_final_sol(sol, t0_sol)
 
-  plot1 = plot(fechas_sol[2:end], estado_nI(sol), title = "Reportados", yscale = scale)
-  scatter!(plot1, lossRep.dias, lossRep.data)
+  plot1 = plot(fechas_sol, estado_cI(sol), title = "Reportados", yscale = scale)
+  scatter!(plot1, lossCumRep.dias, lossCumRep.data)
 
-  plot2 = plot(fechas_sol, estado_Hc(sol), title = "UCI", yscale = scale)
-  scatter!(plot2, lossUCI.dias, lossUCI.data)
+  plot2 = plot(fechas_sol, estado_cHc(sol), title = "UCI", yscale = scale)
+  scatter!(plot2, lossCumUCI.dias, lossCumUCI.data)
 
-  plot3 = plot(fechas_sol[2:end], estado_nD(sol), title = "Fallecidos", yscale = scale)
-  scatter!(plot3,lossDEIS.dias, lossDEIS.data)
+  plot3 = plot(fechas_sol[2:end], estado_D(sol)[2:end], title = "Fallecidos acumulados", yscale = scale)
+  scatter!(plot3,lossCumDEIS.dias, lossCumDEIS.data)
 
   plot(plot1, plot2, plot3, layout = (1,3))
 end
