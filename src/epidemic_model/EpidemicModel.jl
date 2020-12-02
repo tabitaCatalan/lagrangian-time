@@ -194,9 +194,9 @@ Modelo epidemiológico tipo SEIIRHHD
 - `p::ModelParam`
 - `t`:
 """
-function seiirhhd!(du,u,p_vec,t)
+function seiirhhd!(du,u,p::ModelParam,t)
     # Extraer parametros
-    p = make_model_param(p_vec[1], p_vec[2])
+    #p = make_model_param(p_vec[1], p_vec[2])
     γₑ = p.gamma_e; γᵢ = p.gamma_i; γᵢₘ = p.gamma_im
     γₕ = p.gamma_h; γₕ_c = p.gamma_hc
     φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d

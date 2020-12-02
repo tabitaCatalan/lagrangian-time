@@ -308,10 +308,11 @@ end
 
 function prob_gen_onlyopt(prob,p)
   s0 = p[1]
+  β = p[2]
 
   φₑᵢ = 0.5; φᵢᵣ = 0.85; φₕᵣ = 0.85; φ_d = 0.1;
   pᵢ = 0.75; pᵢₘ = 0.75pᵢ; pₑ = 0.5pᵢₘ
-  p_model = ModelParam(p[2], p[3], p[4], p[5], p[6], φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, LambdaParam(1.0, p[7], pₑ, pᵢ , pᵢₘ))
+  p_model = ModelParam(p[3], p[4], p[5], p[6], p[7], φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, LambdaParam(1.0, β, pₑ, pᵢ , pᵢₘ))
 
   remake(prob, u0 = update_initial_s0!(copy_data_u0, s0), p = p_model)
 end
@@ -371,8 +372,8 @@ upper_lmbda = [6.0, 0.2, 0.9, 0.9]
 
 
 #p0 = [u0_params;p0_model; p0_lmbda]
-lower = [0.3; lower_model; 0.1]
-upper = [0.9; upper_model; 6.0]
+lower = [0.3; 0.001; lower_model]
+upper = [0.9; 1.0; upper_model]
 
 prob_ini = prob_generator_full(prob_cuarentena, (lower + upper)/2)
 sol_ini = solve(prob_ini, saveat = 1.0)
