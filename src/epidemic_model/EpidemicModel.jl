@@ -239,7 +239,7 @@ p_E
 - `u:MyDataArray`: estado actual del sistema.
 """
 function calcular_lambda!(λ, lambda_param::LambdaParam{Float64}, P, u::MyDataArray{Float64})
-    α = p.lambda_param.alpha; β = p.lambda_param.beta .* get_riesgos()
+    α = lambda_param.alpha; β = lambda_param.beta .* get_riesgos()
     pₑ = lambda_param.p_E; pᵢ = lambda_param.p_I; pᵢₘ = lambda_param.p_Im
     S = u.x.S; E = u.x.E; I = u.x.I; Iᵐ = u.x.Im; R = u.x.R;
     H = u.x.H; Hc = u.x.Hc; D = u.x.D;
