@@ -214,5 +214,5 @@ end
 Devuelve una lista de 5 strings, con los nombres de los estados del modelo.
 """
 function nombre_estados()
-    return [ "Susceptibles", "Expuestos", "No Reportados Iᵐ", "Reportados I", "Removidos"]
+    return [ "Susceptibles", "Expuestos", "No Reportados Iᵐ", "Reportados I", "Removidos", "Hospitalizados", "UCI", "Muertos"]
 end

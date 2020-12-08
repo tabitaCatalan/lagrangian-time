@@ -172,6 +172,7 @@ TS_reportados = TimeArray(
     CSV.File(minsal_folder * reportados_data),
     timestamp = Symbol("Region")
 )
+TS_reportados_RM = TS_reportados.Metropolitana
 
 TS_GE = TimeArray(CSV.File( minsal_folder * GE_data,
     header = 1:2, datarow = 3),

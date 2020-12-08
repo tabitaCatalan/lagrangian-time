@@ -199,7 +199,7 @@ function seiirhhd!(du,u,p::ModelParam,t)
     #p = make_model_param(p_vec[1], p_vec[2])
     γₑ = p.gamma_e; γᵢ = p.gamma_i; γᵢₘ = p.gamma_im
     γₕ = p.gamma_h; γₕ_c = p.gamma_hc
-    φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d
+    φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d;
     # Calcular parametros a tiempo t
     P = similar(u.P_normal)
     matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t)+1, :])
@@ -212,7 +212,7 @@ function seiirhhd!(du,u,p::ModelParam,t)
     du.x.Im = (1.0 - φₑᵢ) * γₑ * u.x.E - γᵢₘ * u.x.Im
     du.x.R  = γᵢₘ * u.x.Im + φᵢᵣ * γᵢ * u.x.I + φₕᵣ * γₕ * u.x.H
     du.x.H = (1.0 - φᵢᵣ) * γᵢ * u.x.I + (1.0 - φ_d) * γₕ_c * u.x.Hc - γₕ * u.x.H
-    du.x.Hc = (1.0 - φₕᵣ) * γₕ * u.x.H - φ_d * γₕ_c * u.x.Hc
+    du.x.Hc = (1.0 - φₕᵣ) * γₕ * u.x.H - γₕ_c * u.x.Hc
     du.x.D = φ_d * γₕ_c * u.x.Hc
 end;
 
@@ -277,12 +277,12 @@ Crea un vector por componentes con las condiciones iniciales.
 function set_up_inicial_conditions(total_por_clase)
     n_clases = length(total_por_clase)
     e0 = (129/n_clases)*ones(n_clases)
-    i0 = (174/n_clases)*zeros(n_clases) #10*ones(n_clases)
-    im0 = (1799/n_clases)*zeros(n_clases) #100*ones(n_clases)
+    i0 = (174/n_clases)*ones(n_clases) #10*ones(n_clases)
+    im0 = (1799/n_clases)*ones(n_clases) #100*ones(n_clases)
     r0 = zeros(n_clases)
-    h0 = (40/n_clases)*zeros(n_clases)
-    hc0 = (4/n_clases)*zeros(n_clases)
-    d0 = zeros(n_clases)
+    h0 = (40/n_clases)*ones(n_clases)
+    hc0 = (4/n_clases)*ones(n_clases)
+    d0 = zeros(n_clases) #(2/n_clases)*ones(n_clases)
     s0 = total_por_clase - e0
 
     u0 = ComponentArray(S = s0, E = e0, Im = im0, I = i0, R = r0, H = h0, Hc = hc0, D = d0)
@@ -341,9 +341,9 @@ function set_up_parameters3(α₁,α₂, beta₁, beta₂, nu, phi, gi, gm, τ, 
 end
 
 function get_riesgos()
-    return [0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
+    #return [0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
     # Version con numero de contactos
-    # [1, 10, 30, 20, 5, 10, 40, 50, 80, 2, 2, 2, 5]
+    return [1, 10, 30, 20, 5, 10, 40, 50, 80, 2, 2, 2, 5]
 end
 
 function get_riesgos!(beta)
