@@ -122,6 +122,19 @@ function total_estado_por_clase(sol, index_clase; estado = 1:18)
 end
 
 
+function plot_total_all_states(sol; index_clase = 1:18)
+    estados = index_estados(18)
+    plots = []
+    nombres = nombre_estados()
+    for i in 1:length(estados)
+        a_plot = plot(sol.t,
+            total_estado_por_clase(sol, index_clase, estado = estados[i]),
+            title = nombres[i], label = :none)
+        push!(plots, a_plot)
+    end
+    plot(plots...)
+end
+
 """
     plot_all_states(sol, n_clases, nombre_clases ;indexs = 1:n_clases)
 Hace una figura, graficando por separado cada estado (S, E, I, etc) c/r al tiempo.
