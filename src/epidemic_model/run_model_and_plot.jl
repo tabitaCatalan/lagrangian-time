@@ -57,22 +57,36 @@ total_por_clase = total_por_clase_censo/10
 
 u0 = set_up_inicial_conditions(total_por_clase)
 
-frac, times_frac= obtener_frac_cuarentena_from_csv(
-    "..\\..\\data\\CuarentenasRMv2.csv",
-    "..\\..\\data\\EOD2012-Santiago.db",
-    "query-poblacion-clase.sql",
-    modo  =:cuarentena
-)
+###########################################
+######## Datos Cuarentenas ################
+###########################################
+csv_cuarentena = "..\\..\\data\\CuarentenasRMv2.csv"
+eod_db = "..\\..\\data\\EOD2012-Santiago.db"
+pobla_query = "..\\epidemic_model\\query-poblacion-clase.sql"
 
+frac_cuarentena, dias_cuarentena = obtener_frac_cuarentena_from_csv(
+    csv_cuarentena, eod_db, pobla_query,
+    delim = ',', tramos = true, modo = :cuarentena
+)
+numero_dias = length(frac_cuarentena)
+csv_paso_a_paso = "..\\..\\data\\paso_a_paso_por_comunas.csv"
+frac_PaP, dias_PaP = obtener_frac_cuarentena_from_csv(
+    csv_paso_a_paso, eod_db, pobla_query, tramos = true,
+    delim = ',', modo = :PaP
+);
+
+frac_outbreak = [frac_cuarentena; frac_PaP]
+dias_outbreak = [dias_cuarentena; dias_PaP];
 #TS_frac = TimeArray(times_frac, frac, [:T1, :T2, :T3])
 
+plot(frac_outbreak)
 
 
 fecha0 = Date(2020, 3, 17)
-index0 = findfirst(isequal(fecha0), times_frac)
+index0 = findfirst(isequal(fecha0), dias_outbreak)
 
-data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac[index0:end,:], total_por_clase_censo)
-t_final = size(frac)[1] - index0
+data_u0 = MyDataArray{Float64}(u0, P_normal, P_cuarentena, frac_outbreak[index0:end,:], total_por_clase_censo)
+t_final = size(frac_outbreak)[1] - index0
 
 #############################################
 # Definir parametros
@@ -88,10 +102,9 @@ begin
     dias = 10
     γₑ = 1/5; γᵢ = 1/dias; γᵢₘ = 1/dias;
     γₕ = 1/6; γₕ_c = 1/10;
-    φₑᵢ = 0.5; φᵢᵣ = 0.85; φₕᵣ = 0.85; φ_d = 0.1;
+    φₑᵢ = 0.5; φᵢᵣ = 0.85; φₕᵣ = 0.85; φ_d = 0.1
     p = ModelParam(γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, lambda_param)
     p_vec = [γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, 1.0, β, pₑ, 1.0, pᵢₘ]
-
     tspan = (0.0,t_final)
     #τ = 100. # tiempo de implementar medidas
 
@@ -108,9 +121,16 @@ end
 ### Resolver
 save_at = 1.
 
-prob_cuarentena = ODEProblem(seiirhhd!,data_u0,tspan,(p_vec[1:9],p_vec[10:14]))
+prob_cuarentena = ODEProblem(seiirhhd!,data_u0,tspan,make_model_param(p_vec))
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at);
 
+plot_total_all_states(sol_cuarentena)
+
+size(sol_cuarentena')
+size(frac)
+a = 1
+
+#=
 plot_comparar_datos(sol_cuarentena)
 plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
 plot_comparar_datos(sol_cuarentena)
@@ -119,7 +139,7 @@ prob_normal = ODEProblem(seiirhhd!,data_u0,tspan,p_vec)
 sol_normal = solve(prob_normal, saveat = save_at);
 
 a = 1
-#=
+
 prob_cuarentena = remake(prob_normal; p = p2)
 sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
 =#
@@ -128,10 +148,10 @@ sol_cuarentena = solve(prob_cuarentena, saveat = save_at)
 #plot_all_states(sol_normal, n_clases, nombre_clases; indexs = joven)
 
 
-plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
+#plot_all_states(sol_cuarentena, n_clases, nombre_clases; indexs = joven)
 
 
-
+#=
 prob_retormar_normalidad = ODEProblem(seiir_Pt!, u0, tspan, p3)
 sol_retormar_normalidad = solve(prob_retormar_normalidad, saveat = save_at)
 prob_retomar_trabajo = remake(prob_retormar_normalidad; p = p4)
@@ -163,7 +183,7 @@ plot_nuevos_contagios(
     labels = ["Cuarentena siempre" "Retomar clases en t=$τ" "Vuelta al trabajo en t=$τ" "Eliminar mascarillas en t=$τ"];
     title = "Contagios diarios")
 savefig(output_folder*"comparar_nuevos_contagios2456"*filename*extension)
-
+=#
 #=
 plot_nuevos_contagios(
     [sol_normal, sol_cuarentena],

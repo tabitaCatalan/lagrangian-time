@@ -104,6 +104,14 @@ function aplicar_cuarentena!(P)
     δ = calcular_delta(P)
     reducir_tiempo_trabajo!(P)
     reducir_tiempo_estudios!(P)
+
+    # Otros ambientes
+    recreacion = 8; visitas = 5; compras = 4
+    reducir_tpo_en_ambiente!(P, recreacion, 95)
+    reducir_tpo_en_ambiente!(P, visitas, 95)
+    reducir_tpo_en_ambiente!(P, compras, 40)
+
+
     corregir_tiempo_transporte!(P, δ)
 end
 
@@ -179,6 +187,19 @@ function reducir_tiempo_trabajo!(P)
 end
 
 
+"""
+    reducir_tpo_en_ambiente!(P, ambiente, p100_reduccion)
+Modifica la matriz P, reduciendo el tiempo gastado en un ambiente para todas
+las clases en un porcentaje. Agrega ese tiempo al hogar.
+- `P`: matriz de tiempos de residencia.
+- `ambiente::Int`: numero de columna de la matriz al que se le reducirá el tpo.
+- `p100_reduccion`: porcentaje de reduccion (entre 0 y 100).
+"""
+function reducir_tpo_en_ambiente!(P, ambiente, p100_reduccion)
+    hogar = 1
+    P[:,hogar] += (p100_reduccion/100)*P[:,ambiente]
+    P[:,ambiente] *= (100 - p100_reduccion)/100
+end
 
 """
     reducir_tiempo_estudios!(P)
@@ -189,10 +210,8 @@ estudios en un 95% (y agregándolo al hogar).
 Matriz de tiempos de residencia.
 """
 function reducir_tiempo_estudios!(P)
-    hogar = 1
     estudios = 3
-    P[:,hogar] += 0.95*P[:,estudios]
-    P[:,estudios] *= 0.05
+    reducir_tpo_en_ambiente!(P, estudios, 95)
 end
 
 """
@@ -204,9 +223,10 @@ los ambientes asociados a transporte a la mitad (y agregándolo al hogar).
 Matriz de tiempos de residencia.
 """
 function reducir_tiempo_transporte!(P)
-    transporte = 9:12
-    P[:,1] += sum(P[:, transporte], dims = 2)/2.
-    P[:, transporte] /= 2.0
+    medios_de_transporte = 9:12
+    for transporte in medios_de_transporte
+        reducir_tpo_en_ambiente!(P, transporte, 50)
+    end
 end
 
 v_p100s = Dict{Int,Vector{Float64}}(1 => [0.1,0.5,0.8], 5=> [-0.1,0.4,0.6])

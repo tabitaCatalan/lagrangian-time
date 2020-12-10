@@ -85,18 +85,18 @@ https://www.minsal.cl/presidente-sebastian-pinera-presenta-plan-paso-a-paso/
 """
 function procesar_PaP!(cuarentenas_en_t, modo)
     if modo == :cuarentena
+        comunas_sin_cuarentena = cuarentenas_en_t .== 0
+        cuarentenas_en_t[comunas_sin_cuarentena] .= 0.25 # diremos que sin había un 25% de cuarentena y un 75% de normalidad
+
     elseif modo == :PaP
-        # encontrar los indices de los grupos: 1,2 y 3-5
-        # 1 -> 1 = 100% gente en cuarentena. No se cambia nada.
-        # 2 -> 2/7 ≈ 29% gente en cuarentena
-        fase2 = cuarentenas_en_t .== 2
-        cuarentenas_en_t[fase2] .= 2/7
-        # 3-5 -> 0 = 0% gente en cuarentena
-        fase3 = cuarentenas_en_t .== 3
-        fase4 = cuarentenas_en_t .== 4
-        fase5 = cuarentenas_en_t .== 5
-        sin_cuarentena_indexs = max.(fase3, fase4, fase5) # se está en alguna de esas fases
-        cuarentenas_en_t[sin_cuarentena_indexs] .= 0
+
+        # El paso 1 es 100% cuarentena, el paso 2 es 90% cuarentena, ... etc.
+        p100_cuarentena_paso = (100, 90, 75, 50, 25)
+
+        for i in 1:5
+            paso_i = cuarentenas_en_t .== i
+            cuarentenas_en_t[paso_i] .= p100_cuarentena_paso[i]/100
+        end
     else
         print("Ingrese un modo válido. Las opciones disponibles son :cuarentena y :PaP (paso a paso)")
     end
@@ -142,6 +142,7 @@ Se usan los siguientes datos:
 function calcular_frac_cuarentena_en_t_por_tramo!(frac, tiempo, data_cuarentenas, df, modo)
     t_floor = floor(Int, tiempo)
     pobla_tramo = (2456390, 3071158, 1585260)
+    pobla_en_cuarentena = calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
     pobla_en_cuarentena = calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
     frac_t1 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 1])/pobla_tramo[1]
     frac_t2 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 2])/pobla_tramo[2]
