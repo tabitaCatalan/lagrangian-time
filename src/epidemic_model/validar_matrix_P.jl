@@ -1,4 +1,5 @@
 #=
+validar_matrix_P.jl
 Validar la forma en que se está modificando la matriz P
 =#
 
@@ -64,16 +65,28 @@ fechas_sol = t0_sol:Dates.Day(1):(dia_final_sol(sol_cuarentena, t0_sol) - Dates.
 #fechas_sol = Dates.format.(fechas_sol, "dd/mm")
 length(fechas_sol)
 
+index_transporte() = 9:12
+
 begin
-    ambientes_plot = plot(title = "Variación ambientes, Estudios, 0.2 T1, 0.4 T2 y 0.6 T3,\n (0.3,0.6,0.9) Rec")
-    plot!(ambientes_plot, fechas_sol,
-        variacion_ambiente(data_u0, index_transporte(), tspan),
-        label = "Medios de transporte"
-    )
+    ambientes_plot = plot(title = "Variación transporte")
+
     plot!(ambientes_plot,  fechas_sol,
         variacion_ambiente(data_u0, index_transporte(), tspan, tramos = true),
         label = ["Trans nvl bajo" "Trans nvl medio" "Trans nvl alto"]
     )
+
+end
+
+
+begin
+    ambientes_plot = plot(title = "Variación ambientes")
+    #=
+    plot!(ambientes_plot, fechas_sol,
+        variacion_ambiente(data_u0, index_transporte(), tspan),
+        label = "Medios de transporte"
+    )=#
+
+
     plot!(ambientes_plot,  fechas_sol,
         variacion_ambiente(data_u0, 9, tspan),
         label = "TP"
