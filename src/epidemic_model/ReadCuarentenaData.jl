@@ -86,7 +86,7 @@ https://www.minsal.cl/presidente-sebastian-pinera-presenta-plan-paso-a-paso/
 function procesar_PaP!(cuarentenas_en_t, modo)
     if modo == :cuarentena
         comunas_sin_cuarentena = cuarentenas_en_t .== 0
-        cuarentenas_en_t[comunas_sin_cuarentena] .= 0.25 # diremos que sin había un 25% de cuarentena y un 75% de normalidad
+        cuarentenas_en_t[comunas_sin_cuarentena] .= 0.5 # diremos que sin había un 75% de cuarentena y un 25% de normalidad
 
     elseif modo == :PaP
 
