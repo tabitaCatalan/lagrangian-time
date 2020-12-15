@@ -102,16 +102,14 @@ y el tiempo fuera del hogar. Esta proporción se llama δ y se calcula para cada
 """
 function aplicar_cuarentena!(P)
     δ = calcular_delta(P)
-
+    reducir_tiempo_trabajo!(P)
     reducir_tiempo_estudios!(P)
 
-    trabajo = 2; recreacion = 8; visitas = 5; compras = 4
-    reducir_tiempo_ambiente_por_clase!(P, trabajo, (0.2, 0.4, 0.6))
-    #reducir_tiempo_ambiente_por_clase!(P, recreacion, (0.3, 0.6, 0.9))
-    reducir_tiempo_ambiente_por_clase!(P, visitas, (0.0, 0.0, 0.0))
-    reducir_tpo_en_ambiente!(P, recreacion, 75)
-    #reducir_tpo_en_ambiente!(P, visitas, 95)
-    reducir_tiempo_ambiente_por_clase!(P, compras, (0.0, 0.0, 0.0))
+    # Otros ambientes
+    recreacion = 8; visitas = 5; compras = 4
+    reducir_tpo_en_ambiente!(P, recreacion, 95)
+    reducir_tpo_en_ambiente!(P, visitas, 95)
+    reducir_tpo_en_ambiente!(P, compras, 40)
 
 
     corregir_tiempo_transporte!(P, δ)
@@ -137,14 +135,10 @@ lugares fuera del hogar (que no incluyan transporte), para cada clase.
 """
 function calcular_delta(P)
     hogar = 1:1
-    transporte = index_transporte()
+    transporte = 9:12
     lugares_fuera_del_hogar = [collect(2:8); 13]
     δ = sum(P[:,transporte], dims = 2)./sum(P[:,lugares_fuera_del_hogar], dims = 2)
     δ
-end
-
-function index_transporte()
-    9:12
 end
 
 
@@ -160,7 +154,7 @@ proporción de estos tiempos constante (δ, calcudala previamente)
 """
 function corregir_tiempo_transporte!(P, δ)
     hogar = 1:1
-    transporte = index_transporte()
+    transporte = 9:12
     lugares_fuera_del_hogar = [collect(2:8); 13]
     tiempo_transporte_antiguo = sum(P[:,transporte], dims = 2)
     tiempo_fuera_hogar_nuevo = sum(P[:,lugares_fuera_del_hogar], dims = 2)
@@ -179,16 +173,17 @@ para la clase alta (y agregándolo al hogar).
 - `P`: array de dim 2
     Matriz de tiempos de residencia.
 """
-function reducir_tiempo_ambiente_por_clase!(P, ambiente, fraccion_por_clase)
+function reducir_tiempo_trabajo!(P)
     hogar = 1
-    tpo_ambiente = P[:,ambiente]
-    clase_baja, clase_media, clase_alta = index_clases()
+    trabajo = 2
+    tpo_trabajo = P[:,trabajo]
+    clase_baja, clase_media, clase_alta = index_clases() # FALTA ESTO...
     frac_reduccion = ones(18)
-    frac_reduccion[clase_baja] .= fraccion_por_clase[1]
-    frac_reduccion[clase_media] .= fraccion_por_clase[2]
-    frac_reduccion[clase_alta] .= fraccion_por_clase[3]
-    P[:,hogar] += tpo_ambiente.*frac_reduccion
-    P[:,ambiente] -= tpo_ambiente.*frac_reduccion
+    frac_reduccion[clase_baja] .= 0.2
+    frac_reduccion[clase_media] .= 0.5
+    frac_reduccion[clase_alta] .= 0.8
+    P[:,hogar] += tpo_trabajo.*frac_reduccion
+    P[:,trabajo] -= tpo_trabajo.*frac_reduccion
 end
 
 
@@ -228,7 +223,7 @@ los ambientes asociados a transporte a la mitad (y agregándolo al hogar).
 Matriz de tiempos de residencia.
 """
 function reducir_tiempo_transporte!(P)
-    medios_de_transporte = index_transporte()
+    medios_de_transporte = 9:12
     for transporte in medios_de_transporte
         reducir_tpo_en_ambiente!(P, transporte, 50)
     end
