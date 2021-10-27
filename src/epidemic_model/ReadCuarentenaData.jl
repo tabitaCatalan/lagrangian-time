@@ -11,6 +11,8 @@ https://diffeq.sciml.ai/dev/features/diffeq_arrays/#control_problem
 using TimeSeries
 using SQLite
 using DataFrames
+using CSV
+include("..\\ReadDataUtils.jl")
 
 """
     contar_dias(TS::TimeSeries)
@@ -19,47 +21,61 @@ Cuenta la cantidad de días de una serie de tiempo
 contar_dias(TS::TimeArray) = length(timestamp(TS))
 
 """
-    read_data_cuarentena(csv_cuarentena; delim = ';')
-# Argumentos
-- `csv_cuarentena::String`: path al csv con la serie de tiempo correspondiente a
-    la cuarentena por dia y comuna.
-# Salida
-- `data_cuarentena::TimeSeries`  (fechas en las filas, comunas en las columnas)
-- `numero_dias`: cuantos dias están considerados en los datos.
+Transforma el formato de fecha usado en los datos del Paso a Paso a `Date`
 # Ejemplo
-```julia
-data_cuarentenas, numero_dias = read_data_cuarentena('..\\..\\data\\CuarentenasRM.csv';
-    delim = ';'
-)
+```
+julia> parse_str_date("22-jul", 2020)
+2020-07-22
 ```
 """
-function read_data_cuarentena(csv_cuarentena; delim = delim)
-    data_cuarentenas = readtimearray(csv_cuarentena; delim = delim)
-    numero_dias = contar_dias(data_cuarentenas)
-    data_cuarentenas, numero_dias
+function parse_str_date(str_date, agno)
+    str_splited = split(str_date, "-")
+    dia = parse(Int,str_splited[1])
+    mes = parse_month(str_splited[2])
+    Date(agno,mes,dia)
 end
 
 """
-    read_db(eod_db, sql_query)
-Ejecuta una consulta a una base de datos
-# Argumentos
-- `eod_db::String`: path a la base de datos EOD
-- `sql_query::String`: path al archivo con la consulta SQL.
-# Resultados
-- `result_df::DataFrame`: con los resultados de la consulta.
+    parse_month(str_month)
+Transforma ciertos strings que representan un mes a su número
+# Ejemplo
+julia> parse_month("jul")
+7
+julia> parse_month("dic")
+12
 """
-function read_db(eod_db, sql_query)
-    DB_EOD =  SQLite.DB(eod_db)
-
-    # Leer consulta SQL del archivo y guardar como String
-    io = open(sql_query)
-    sql = read(io, String)
-    close(io)
-
-    result_df = DataFrame(DBInterface.execute(DB_EOD, sql))
-    result_df
+function parse_month(str_month)
+    if str_month == "ene"
+        1
+    elseif str_month == "feb"
+        2
+    elseif str_month == "jul"
+        7
+    elseif str_month == "ago"
+        8
+    elseif str_month == "sept"
+        9
+    elseif str_month == "oct"
+        10
+    elseif str_month == "nov"
+        11
+    elseif str_month == "dic"
+        12
+    end
 end
 
+"""
+Lee datos del plan paso a paso obtenidos de:
+https://docs.google.com/spreadsheets/d/1WieweYNSPdpmjUIyYcbKp1oaqwlnD61_/edit#gid=275689720
+"""
+function read_data_PaP(csv_paso_a_paso, agno)
+    parse_agno = (str) -> parse_str_date(str, agno)
+    PaP = TimeArray(CSV.File(csv_paso_a_paso, transpose = true, datarow = 4, header = 2),
+        timestamp = Symbol("CUT"), timeparser = parse_agno
+    )
+    PaP_RM = PaP[colnames(PaP)[258:309]]
+    PaP_RM
+end
 
 """
     procesar_PaP!(cuarentenas_en_t, modo)
@@ -89,7 +105,6 @@ function procesar_PaP!(cuarentenas_en_t, modo)
         cuarentenas_en_t[comunas_sin_cuarentena] .= 0.5 # diremos que sin había un 75% de cuarentena y un 25% de normalidad
 
     elseif modo == :PaP
-
         # El paso 1 es 100% cuarentena, el paso 2 es 90% cuarentena, ... etc.
         p100_cuarentena_paso = (100, 90, 75, 50, 25)
 
@@ -102,13 +117,12 @@ function procesar_PaP!(cuarentenas_en_t, modo)
     end
 end
 
-
 """
     calcular_pobla_en_cuarentena(tiempo, data_cuarentenas, df)
 Calcula la cantidad de personas que están en cuarentena en cierto tiempo.
 """
 function calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
-    cuarentenas_en_t = values(data_cuarentenas[t_floor])'
+    cuarentenas_en_t = Float64.(values(data_cuarentenas[t_floor])')
     #comunas_sin_cuarentena = [34, 42, 44, 46, 47, 50]
     #comunas_sin_cuarentena = []
     #f = i -> in(i, comunas_sin_cuarentena)
@@ -143,7 +157,7 @@ function calcular_frac_cuarentena_en_t_por_tramo!(frac, tiempo, data_cuarentenas
     t_floor = floor(Int, tiempo)
     pobla_tramo = (2456390, 3071158, 1585260)
     pobla_en_cuarentena = calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
-    pobla_en_cuarentena = calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
+    #pobla_en_cuarentena = calcular_pobla_en_cuarentena_en_t(t_floor, data_cuarentenas, df, modo)
     frac_t1 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 1])/pobla_tramo[1]
     frac_t2 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 2])/pobla_tramo[2]
     frac_t3 = sum(pobla_en_cuarentena[df.tramo_pobreza .== 3])/pobla_tramo[3]
@@ -151,6 +165,9 @@ function calcular_frac_cuarentena_en_t_por_tramo!(frac, tiempo, data_cuarentenas
     frac[t_floor,2] = frac_t2
     frac[t_floor,3] = frac_t3
 end
+
+
+
 
 """
     calcular_frac_cuarentena(data_cuarentenas, df)
@@ -182,6 +199,7 @@ function calcular_frac_cuarentena_por_tramo(data_cuarentenas, df, modo)
     frac
 end
 
+
 """
     obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query, delim = ';', mode)
 # Argumentos
@@ -200,8 +218,12 @@ La fecha debe estar en formato `YYYY-MM-DD`. Los datos son binarios, indicando s
 # Ejemplo
 frac_cuarentena = obtener_frac_cuarentena_from_csv('CuarentenaRM.csv', 'EOD2012-Santiago.db', 'query-poblacion-clase.sql')
 """
-function obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query; delim = ',', tramos = true, modo)
-    data_cuarentenas, numero_dias = read_data_cuarentena(csv_cuarentena; delim = delim)
+function obtener_frac_cuarentena_from_csv(csv_cuarentena, eod_db, pobla_query, agno; delim = ',', tramos = true, modo)
+    if modo == :cuarentena
+        data_cuarentenas = readtimearray(csv_cuarentena; delim = delim)
+    elseif modo == :PaP
+        data_cuarentenas = read_data_PaP(csv_cuarentena, agno)
+    end
     tramos_df = read_db(eod_db, pobla_query)
     if tramos
         frac = calcular_frac_cuarentena_por_tramo(data_cuarentenas, tramos_df, modo)
