@@ -84,15 +84,15 @@ plot_compare_function_of_sols_grouping(
 )
 ```
 """
-function plot_compare_function_of_sols_grouping(sols, index_grupos, a_function; labels_grupos, title="", kwargs...)
+function plot_compare_function_of_sols_grouping(sols, index_grupos, a_function; labels_grupos, title="", dias = sols[1].t, scale = :identity, kwargs...)
     L = length(sols)
     a_plot = plot(title=title)
     for k in 1:length(index_grupos)
         for l in 1:L-1
             α = calcular_alpha(l,L)
-            plot!(a_plot, sols[l].t, a_function(sols[l],index_grupos[k]; kwargs...), color = k, alpha = α, label = :none)
+            plot!(a_plot, dias, a_function(sols[l],index_grupos[k]; kwargs...), color = k, alpha = α, label = :none)
         end
-        plot!(a_plot, sols[end].t,  a_function(sols[end],index_grupos[k]; kwargs...), color = k, label = labels_grupos[k])
+        plot!(a_plot, dias,  a_function(sols[end],index_grupos[k]; kwargs...), color = k, label = labels_grupos[k], yscale = scale)
     end
     return a_plot
 end
@@ -114,22 +114,28 @@ function calcular_alpha(l, L)
 end
 
 function incidencia_por_clase(sol, index_clase; estado, total_por_clase)
-    return sum(sol'[:, estado[index_clase]], dims = 2)/sum(total_por_clase[index_clase])
+    return 1e5 .* sum(sol'[:, estado[index_clase]], dims = 2)/sum(sol.prob.u0.total_por_clase[index_clase])
 end
+
+
 
 function total_estado_por_clase(sol, index_clase; estado = 1:18)
     return sum(sol'[:, estado[index_clase]], dims = 2)
 end
 
 
-function plot_total_all_states(sol; index_clase = 1:18)
-    estados = index_estados(18)
+function plot_total_all_states(sols, t0_sol; index_clase = 1:18, estados = index_estados_seiirhhcd(18), nombres = nombre_estados_seiirhhcd())
     plots = []
-    nombres = nombre_estados()
+    n_dias = size(sols[1]')[1]
+    fechas  = t0_sol:Dates.Day(1):(t0_sol + Dates.Day(n_dias - 1))
     for i in 1:length(estados)
-        a_plot = plot(sol.t,
-            total_estado_por_clase(sol, index_clase, estado = estados[i]),
-            title = nombres[i], label = :none)
+            a_plot = plot(title = nombres[i])
+        for sol in sols
+            plot!(a_plot, fechas,
+                total_estado_por_clase(sol, index_clase, estado = estados[i]),
+                label = :none
+            )
+        end
         push!(plots, a_plot)
     end
     plot(plots...)
@@ -210,7 +216,7 @@ julia> s, e, im, i, r, h, hc, d = index_estados(3)
 (1:3, 4:6, 7:9, 10:12, 13:15, 16:18, 19:21, 22:24)
 ```
 """
-function index_estados(n_clases)
+function index_estados_seiirhhcd(n_clases)
     s = 1:n_clases
     e = n_clases+1:2*n_clases
     im = 2*n_clases+1:3*n_clases
@@ -222,10 +228,19 @@ function index_estados(n_clases)
     s, e, im, i, r,h, hc, d
 end
 
+function index_estados_seii(n_clases)
+    s = 1:n_clases
+    e = n_clases+1:2*n_clases
+    i = 2*n_clases+1:3*n_clases
+    im = 3*n_clases+1:4*n_clases
+    ci = 4*n_clases+1:5*n_clases
+    s, e, i, im, ci
+end
+
 """
-    nombre_estados()
-Devuelve una lista de 5 strings, con los nombres de los estados del modelo.
+    nombre_estados_seiirhhcd()
+Devuelve una lista de 8 strings, con los nombres de los estados del modelo.
 """
-function nombre_estados()
+function nombre_estados_seiirhhcd()
     return [ "Susceptibles", "Expuestos", "No Reportados Iᵐ", "Reportados I", "Removidos", "Hospitalizados", "UCI", "Muertos"]
 end
