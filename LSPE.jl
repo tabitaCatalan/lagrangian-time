@@ -37,8 +37,9 @@ end
 
 index_susc(;n_clases = 18) = rango_estado(1, n_clases)
 index_infec(; n_clases = 18) = rango_estado(3, n_clases)
-index_uci(;n_clases = 18) = rango_estado(7, n_clases)
-index_muertos(;n_clases = 18) = rango_estado(8, n_clases)
+index_cumrep(;n_clases = 18) = rango_estado(5, n_clases)
+#index_uci(;n_clases = 18) = rango_estado(7, n_clases)
+#index_muertos(;n_clases = 18) = rango_estado(8, n_clases)
 
 ##### Preparar solución y datos para comparar #####
 """
@@ -46,12 +47,12 @@ index_muertos(;n_clases = 18) = rango_estado(8, n_clases)
 Calcula para un estado la diferencia entre el número de personas entre un día
 y el anterior.
 """
-function nuevos_diarios(sol::DiffEqBase.DESolution, estado; index_grupo = 1:18, dias)
-    sum(sol'[2:dias+1, estado[index_grupo]] - sol'[1:dias, estado[index_grupo]], dims = 2)
-end
-
 function nuevos_diarios(sol::DiffEqBase.DESolution, estado; index_grupo = 1:18)
     sum(sol'[2:end, estado[index_grupo]] - sol'[1:end-1, estado[index_grupo]], dims = 2)
+end
+
+function nuevos_diarios(acumulados)
+    acumulados[2:end] - acumulados[1:end-1]
 end
 
 cuantos_dias(t0::Date, t1::Date) = (t1-t0).value
@@ -79,12 +80,6 @@ function suma_por_fila_y_filtrar_fecha(TS::TimeArray, t0::Date, tf::Date)
   sum(values(TS[t0:Dates.Day(1):tf]), dims = 2)
 end
 
-function start_and_finish_dates()
-  t0 = Date(2020,4,12)
-  tf = Date(2020,7,1)
-  t0, tf
-end
-
 function drop_missing_and_vectorize(array2)
   L = length(array2)
   vector = Vector{Float64}(undef, L)
@@ -93,8 +88,6 @@ function drop_missing_and_vectorize(array2)
   end
   vector
 end
-
-t0, t1 = start_and_finish_dates()
 
 ############################
 ### Funciones de pérdida ###
@@ -147,7 +140,7 @@ struct LossData{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
   data::Vector{T}
   index_dias::Vector{I}
 
-  function LossData(dias::Vector{Date}, data::Vector{T}, t0_sol::Date, tf_sol::Date) where {T<:Real}
+  function LossData(dias::Vector{Date}, data::Vector{T}, data0::T, t0_sol::Date, tf_sol::Date; cumulative::Bool) where {T<:Real}
     if length(data) != length(dias)
       error("Los vectores `dias` y `data` deben ser del mismo largo.")
     end
@@ -160,30 +153,35 @@ struct LossData{D<:Date,T<:Real,I<:Integer} <: DiffEqBase.DECostFunction
     full_index = collect(1:length(full_dias))
     index_dias = full_index[is_in(full_dias, dias)]
 
-    new{Date,T,eltype(index_dias)}(t0,tf,dias[index_en_rango],data[index_en_rango],index_dias)
+    if cumulative
+      data0 += 0.0 #sum(data[1:index_en_rango[1]-1])
+    end
+
+    new{Date,T,eltype(index_dias)}(t0,tf,dias[index_en_rango],data0 .+ data[index_en_rango],index_dias)
   end
 end
 
-##### Constructor externos ######
-function LossData(TS::TimeArray, t0_sol::Date, tf_sol::Date)
+##### Constructor externo ######
+function LossData(TS::TimeArray, t0_sol::Date, tf_sol::Date; data0 = 0.0, cumulative = false)
   dias = timestamp(TS)
   data = drop_missing_and_vectorize(suma_por_fila_y_filtrar_fecha(TS, dias[1],dias[end]))
 
-  LossData(dias,data,t0_sol, tf_sol)
+  LossData(dias,data, data0, t0_sol, tf_sol, cumulative = cumulative)
 end
 
 function dia_final_sol(sol::DiffEqBase.DESolution, t0_sol::Date)
-  n_dias = Integer(sol_cuarentena.t[end] - sol_cuarentena.t[1]) + 1
+  n_dias = Integer(sol.t[end] - sol.t[1]) + 1
   tf_sol = t0_sol + Dates.Day(n_dias - 1)
   tf_sol
 end
 
+
 function (f::LossData)(sol_vec, t0_sol::Date)
   index_comparable = f.index_dias .+ cuantos_dias(t0_sol, f.t0)
+  #sum(abs.(sol_vec[index_comparable] - f.data))
   sum((log.(sol_vec[index_comparable]) - log.(f.data)).^2)
 end
 
-cuantos_dias(t0_sol +Dates.Day(1), lossRep.t0)
 #=
 """
   LossData(sol_vec, t0_sol::Date)
@@ -216,275 +214,386 @@ se espera que LossData haya sido creado con parámetro
 
 ######### Incorporar los datos ##########
 
-function estado_nI(sol)
-  φₑᵢ = sol.prob.p.phi_ei
-  -  φₑᵢ * nuevos_diarios(sol, index_susc())
+function estado_cI(sol::DiffEqBase.DESolution; clase = 1:18)
+  #φₑᵢ = sol.prob.p.phi_ei
+  #S0 = sum(sol'[1, index_susc()])
+  #φₑᵢ * (S0 .- sum(sol'[:, (index_susc())[clase] ], dims = 2))
+  sum(sol'[:,(index_cumrep())[clase]], dims = 2)
 end
 
-function estado_cI(sol)
-  φₑᵢ = sol.prob.p.phi_ei
-  S0 = sum(sol'[1, index_susc()])
-  φₑᵢ * (S0 .- sum(sol'[:, index_susc()], dims = 2))
+function estado_nI(sol::DiffEqBase.DESolution; clase = 1:18)
+  nuevos_diarios(sol, index_cumrep(), index_grupo = clase)
+end
+#=
+function estado_Hc(sol::DiffEqBase.DESolution; clase = 1:18)
+  sum(sol'[:, (index_uci())[clase]], dims = 2)
 end
 
-function estado_Hc(sol::DiffEqBase.DESolution)
-  sum(sol'[:, index_uci()], dims = 2)
+function estado_cHc(sol::DiffEqBase.DESolution; clase = 1:18)
+  cumsum(estado_Hc(sol, clase = clase), dims = 1)
 end
 
-function estado_cHc(sol::DiffEqBase.DESolution)
-  cumsum(estado_Hc(sol), dims = 1)
+function estado_D(sol::DiffEqBase.DESolution; clase = 1:18)
+  sum(sol'[:, (index_muertos())[clase] ], dims = 2)
 end
 
-function estado_D(sol)
-  sum(sol'[:, index_muertos()], dims = 2)
+function estado_nD(sol::DiffEqBase.DESolution; clase = 1:18)
+  nuevos_diarios(sol, index_muertos(), index_grupo = clase)
 end
 
 
 function loss(sol::DiffEqBase.DESolution, t0_sol::Date,
-  lossCumUCI::LossData, lossCumRep::LossData, lossCumD::LossData; chi = 1.0 )
+  lossCumUCI::LossData, lossRep::LossData, lossCumRep::LossData, lossCumD::LossData; chi = 1.0 )
   is_failure(sol) && return Inf
 
   un_dia = Dates.Day(1)
 
-  total = lossCumUCI(estado_cHc(sol), t0_sol) +
-    chi * lossCumRep(estado_cI(sol), t0_sol) +
-    lossCumD(estado_D(sol), t0_sol)
+  total = chi * lossRep(estado_nI(sol), t0_sol) + lossCumRep(estado_cI(sol), t0_sol)  +  lossCumUCI(estado_cHc(sol), t0_sol) + lossCumD(estado_D(sol), t0_sol)
+  total
+end
+=#
+
+function loss(sol::DiffEqBase.DESolution, t0_sol::Date, lossCumRep::LossData)
+  is_failure(sol) && return Inf
+
+  un_dia = Dates.Day(1)
+
+  total = lossCumRep(estado_cI(sol), t0_sol)
   total
 end
 
 ################### Función de pérdida ########################
 function acumulados_desde(TS::TimeArray; i0 = 1)
-  cumsum(TS[i0:end], dims = 1)
+  cumsum(TS, dims = 1)[i0:end]
 end
 
 
-t0_sol = Date(2020,3,17)
-lossCumUCI = LossData(acumulados_desde(TS_UCI_RM, i0=15), t0_sol,
-  dia_final_sol(sol_cuarentena, t0_sol))
-lossCumRep = LossData(acumulados_desde(TS_reportados_RM,i0=30),
-  t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
+t0_sol = Date(2020,3,14)
+lossCumRep = LossData(acumulados_desde(TS_reportados_RM, i0 = 15), t0_sol + Dates.Day(1), dia_final_sol(sol, t0_sol), cumulative = true)
+#lossRep = LossData(TS_reportados_RM[15:end], t0_sol + Dates.Day(1), dia_final_sol(sol_cuarentena, t0_sol))
+
+ts[1]
+plot(acumulados_desde(TS_reportados_RM)[1:50])
+scatter!(lossCumRep.dias[1:30], lossCumRep.data[1:30])
+
+#plot(lossRep.dias, lossRep.data)
+#=
+lossCumUCI = LossData(acumulados_desde(TS_UCI_RM), t0_sol,
+  dia_final_sol(sol_cuarentena, t0_sol), data0 = )
 lossCumDEIS = LossData(acumulados_desde(TS_DEIS_RM,i0=20),
   t0_sol, dia_final_sol(sol_cuarentena, t0_sol))
+=#
 
 
-loss_function_reducedRep(sol_cuarentena)
 
-loss_function_reducedRep = (sol) -> loss(sol, t0_sol,
-  lossCumUCI, lossCumRep, lossCumDEIS,
-  chi = 0.05)
+loss_function_reducedRep = (sol) -> loss(sol, t0_sol, lossCumRep)
 
+loss_function_reducedRep(sol)
 
+#loss_function_reducedRep(sol_onlyopt)
+
+#loss(sol_onlyopt, t0_sol, lossCumUCI, lossCumRep, lossCumDEIS)
+#=
+lossCumRep(estado_cI(sol_onlyopt), t0_sol)
+lossCumUCI(estado_cHc(sol_onlyopt), t0_sol)
+lossCumDEIS(estado_D(sol_onlyopt), t0_sol)=#
 ####################################################
 ### Optimizar los parámetros                     ###
 ### Requiere haber corrido run_model_and_plot.jl ###
 ####################################################
-function update_initial_condition!(data_u0::MyDataArray, u0_params)
-  data_u0.x.S = u0_params[1] * data_u0.total_por_clase
-  data_u0.x.E = u0_params[2] * data_u0.total_por_clase
-  data_u0.x.I = u0_params[3] * data_u0.total_por_clase
-  data_u0.x.Im = u0_params[4] * data_u0.total_por_clase
-  data_u0.x.R = u0_params[5] * data_u0.total_por_clase
-  data_u0.x.H = u0_params[6] * data_u0.total_por_clase
-  data_u0.x.Hc = u0_params[7] * data_u0.total_por_clase
-  data_u0.x.D = u0_params[8] * data_u0.total_por_clase
-  data_u0
-end
+copy_data_u0 = copy(u0)
 
-function update_initial_s0!(data_u0::MyDataArray, s0)
-  data_u0.x.S = s0 * data_u0.total_por_clase
-  data_u0
+function update_u0!(data_u0, p::ModelParam, χ)
+    n_clases = length(data_u0.total_por_clase)
+    e0_total = χ[3]*χ[2]/(p.phi_ei * p.gamma_e)
+    im0_total = e0_total * (1. - p.phi_ei)*p.gamma_e/(χ[2] + p.gamma_im)
+
+    data_u0.x.E .= e0_total * data_u0.total_por_clase/sum(data_u0.total_por_clase)
+    data_u0.x.I .= 0.0
+    data_u0.x.Im .= im0_total * data_u0.total_por_clase/sum(data_u0.total_por_clase)
+    data_u0.x.cI .= 0.0
+    data_u0.x.S .= data_u0.total_por_clase - data_u0.x.E - data_u0.x.Im;
 end
 
 
 
-copy_data_u0 = copy(data_u0)
-prob_generator = (prob,p) -> remake(prob,u0 = update_initial_condition!(copy_data_u0, p), p=(p0_model_cte, p0_lmbda_cte))
-prob_generator_full = (prob,p) -> remake(prob,u0 = update_initial_condition!(copy_data_u0, p), p=(p[9:17],p[18:22]))
-
-function prob_generator_s0_beta(prob, p)
-  p_vec[11] = p[2]
-  remake(prob, u0 = update_initial_s0!(copy_data_u0, p[1]), p = (p_vec[1:9], p_vec[10:14]))
-end
-
+[0.16438183724824845, 0.05068548489679065, 0.4984372419195904, 0.19941277664013923, 0.21474378483263964, 0.32117105802944657, 0.7745266812338238, 0.3085262769176047, 0.04898519733784269, 0.14995717499177721] # gamas i iguales
 function prob_gen_onlyopt(prob,p)
-  s0 = p[1]
-  β = p[2]
+  #s0 = p[4] #p[10]
 
-  φₑᵢ = 0.5; φᵢᵣ = 0.85; φₕᵣ = 0.85; φ_d = 0.1;
+  γₑ = p[1] # 0.16670693884606166;
+  γᵢ = p[2] #0.14285714285616494
+  γᵢₘ =p[2] # 0.10896815031718815;
+  γₕ = 0.135 #p[3] # 0.135109 # 0.10925543802432831;
+  γₕ_c = 0.1 #p[4] # 0.14285628589518273;
+
+  φₑᵢ = 0.5;
+  φᵢᵣ = 0.85;
+  φₕᵣ = 0.85;
+  φ_d = 0.2;
+
+  α = p[3]
+  β = p[3]#p[7] #0.048425295377355446;
   pᵢ = 0.75; pᵢₘ = 0.75pᵢ; pₑ = 0.5pᵢₘ
-  p_model = ModelParam(p[3], p[4], p[5], p[6], p[7], φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, LambdaParam(1.0, β, pₑ, pᵢ , pᵢₘ))
+  τ = p[4]
 
-  remake(prob, u0 = update_initial_s0!(copy_data_u0, s0), p = p_model)
+  p_model = ModelParam(γₑ, γᵢ, γᵢₘ, γₕ, γₕ_c, φₑᵢ, φᵢᵣ, φₕᵣ, φ_d, LambdaParam(α, β, pₑ, pᵢ , pᵢₘ), τ)
+  χ = (385.63261209545453, 0.05770318779090708, 777.5140235716095)
+  #prob.u0.total_por_clase .= s0 * total_por_clase_censo
+  update_u0!(prob.u0, p_model, χ)
+  remake(prob, p = p_model)
 end
 
-saveat = 1.0
-cost_function = build_loss_objective(prob_cuarentena,Tsit5(),
-  loss_function, prob_generator = prob_generator,
-  saveat = saveat,
-  maxiters = 10000
-  )
-
-cost_function_full = build_loss_objective(prob_cuarentena,Tsit5(),
-  loss_function, prob_generator = prob_generator_full,
-  saveat = saveat,
-  maxiters = 10000
-  )
-
-cost_function_full_reducedRep = build_loss_objective(prob_cuarentena,Tsit5(),
-  loss_function_reducedRep, prob_generator = prob_generator_full,
-  saveat = saveat,
-  maxiters = 10000
-  )
-
-
-cost_function_s0_beta = build_loss_objective(prob_cuarentena,Tsit5(),
-  loss_function, prob_generator = prob_generator_s0_beta,
-  saveat = saveat,
-  maxiters = 10000
-  )
-
-cost_function_onlyopt = build_loss_objective(prob_cuarentena,Tsit5(),
+cost_function_onlyopt_5 = build_loss_objective(prob_3,Tsit5(),
   loss_function_reducedRep, prob_generator = prob_gen_onlyopt,
-  saveat = saveat,
+  saveat = 1.0,
   maxiters = 10000
   )
 
-cost_function_full(p0)
-cost_function_full(p_10kiter)
+using NLopt
+
+#lower = [1/25, 1/20, 0.04, 50.0]
+#upper = [1/5, 1/5, 0.08, 130.0]
 
 
 
-#s0 = 0.9; e0 = 0.02; i0 = 0.02; im0 = 0.01; r0 = 0.02; h0 = 0.01; hc0=0.01; d0=0.01;
-#u0_params = [s0, e0, i0, im0, r0, h0, hc0, d0]
-#sum(u0_params)
-lower_u0 = [0., 0., 0., 0., 0., 0., 0., 0.]
-upper_u0 = [0.9, 0.01, 0.01, 0.01, 0.01, 0.01, 0.001, 0.]
-
-#const p0_model_cte = p0_model
-#p0_model =    [γₑ,    γᵢ,   γᵢₘ,  γₕ,    γₕ_c,  φₑᵢ, φᵢᵣ, φₕᵣ, φ_d]
-lower_model = [1/6,  1/14, 1/14,  1/10,  1/16] #, 0.5, 0.85, 0.85, 0.1]
-upper_model = [1/4,   1/7,  1/7,   1/2,  1/7] #  0.5, 0.85, 0.85, 0.1]
-
-#const p0_lmbda_cte = p0_lmbda
-#p0_lmbda = [1.0, β, pₑ, 1.0, pᵢₘ] saqué el alfa!
-lower_lmbda = [0.1, 0.0, 0.6, 0.6]
-upper_lmbda = [6.0, 0.2, 0.9, 0.9]
+cost(x) = x[1]^2 - x[2]
+lower = [-3.,-6.]
+upper = [6., 8.]
 
 
-#p0 = [u0_params;p0_model; p0_lmbda]
-lower = [0.3; 0.001; lower_model]
-upper = [0.9; 1.0; upper_model]
+a_plot = plot(title = "Comparación")
+scatter_loss!(a_plot, lossCumRep, nuevos = true)
 
-prob_ini = prob_generator_full(prob_cuarentena, (lower + upper)/2)
-sol_ini = solve(prob_ini, saveat = 1.0)
-plot_comparar_datos(sol_ini, t0_sol)
+cost_function_onlyopt(lower)
 
-cost_function_onlyopt(upper)
+optx
 
-using BlackBoxOptim
+#lower_gamma = [1/20, 1/14, 1/14, 1/10, 1/15]
+#upper_gamma = [1/4, 1/7,  1/7,  1/2,  1/10]
+#             [γₑ,  γᵢ =  γᵢₘ,  γₕ,   γₕ_c]
+lower_gamma = [1/20, 1/20] # 1/10, 1/25]
+upper_gamma = [1/4, 1/5] #  1/5,  1/5]
+#           [φₑᵢ, φᵢᵣ,  φₕᵣ,  φ_d]
+lower_phi = [0.4] #, 0.3, 0.3,  0.02]
+upper_phi = [0.6]#, 0.8, 0.8, 0.8]
+
+#############################################################
+### Problema solo param a optim, Loss reducida en los Reportados
+############################################################
+#p0_model =     φₑᵢ=0.4, φᵢᵣ, φₕᵣ, φ_d]
+#lower_model = [1/6,  1/14, 1/14,  1/10,  1/16, 0.75, 0.7, 0.05]
+#upper_model = [1/4,   1/7,  1/7,   1/2,  1/7, 0.95, 0.95, 0.2]
+
+
+Ns = 11
+
+
+
 #=
-bboptimize(cost_function; SearchRange = (i -> (lower_u0[i], upper_u0[i])).(1:8))
-p_res = [0.0981235, 0.000751838, 4.38449e-5, 0.000295247, 0.117949, 0.000234054, 2.25681e-5, 0.0352279]
-
-res_full = bboptimize(cost_function_full; SearchRange = (i -> (lower[i], upper[i])).(1:22))
-
-
-p0 = [0.9, 0.02, 0.02, 0.01, 0.02, 0.01, 0.01, 0.01, 0.14, 0.1, 0.1, 0.14285714285714285, 0.5, 0.1, 0.9, 0.6, 0.9, 1.0, 3.0, 0.2, 1.0, 0.4]
-p_10kiter = [0.100961, 0.00440102, 0.0613713, 0.0991362, 0.508734, 0.726285, 0.000135861, 0.608562, 0.0100703, 3.82787, 3.98219, 0.0182238, 0.0705907, 0.280078, 0.745378, 0.999952, 0.00671096, 0.722137, 0.970178, 0.929587, 0.96598, 0.00962657]
-
-p_10kiter_3 = [0.217294, 0.00686224, 0.000444803, 0.0239579, 0.626459, 0.00069024, 5.84598e-5, 0.672834, 0.157914, 0.0100634, 2.02298, 3.26838, 0.522249, 0.819409, 0.0840141, 0.982569, 0.0216682, 0.897604, 1.06372, 0.0873241, 0.937055, 0.0838925]
-
-p_50kiter = [0.0969546, 0.146413, 1.09846e-5, 0.104801, 0.297526, 0.00555738, 1.22076e-6, 0.0309135, 0.0103015, 0.0101211, 0.656864, 0.369947, 1.14764, 0.290392, 0.0103027, 0.98965, 0.00207951, 0.521254, 4.79618, 7.40387e-6, 0.944759, 7.03487e-5]
+opt = Opt(:GN_DIRECT_L, 3)
+opt.min_objective = cost_function_onlyopt
+opt.lower_bounds = lower
+opt.upper_bounds = upper
+(optf,optx,ret) = NLopt.optimize(opt, (upper + lower)/2)
 =#
-### Problema Full parametros, Loss iguales
-opt_pro_full = bbsetup(cost_function_full; SearchRange = (i -> (lower[i], upper[i])).(1:22));
-res_full = bboptimize(opt_pro_full, MaxSteps=5000000)
-prob_full_opt = prob_generator_full(prob_cuarentena,res_full.archive_output.best_candidate)
-sol_full = solve(prob_full_opt, saveat =saveat)
+collect(0.1:0.1:1.0)
 
-### Problema Full parametros, Loss reducida en los Reportados
-opt_pro_onlyopt = bbsetup(cost_function_onlyopt; SearchRange = (i -> (lower[i], upper[i])).(1:7));
-res_onlyopt = bboptimize(opt_pro_onlyopt, MaxSteps=5000000)
-prob_onlyopt = prob_generator_full(prob_cuarentena, res_onlyopt.archive_output.best_candidate)
-sol_onlyopt = solve(prob_onlyopt, saveat =saveat)
-plot_comparar_datos(sol_onlyopt, t0_sol)
-
-cost_function_onlyopt(res_onlyopt.archive_output.best_candidate)
+s0s = 0.1:0.1:1.0
+Ns = length(s0s)
+#res_x = Array{Float64,2}(undef,Ns,3)
+#res_f = Vector{Float64}(undef,Ns)
+#for i in 1:Ns
+s0 = 1.0
+data_u0.total_por_clase .= s0 * total_por_clase_censo
+update_u0!(data_u0, p, χ)
 
 
+1/optx[2]
+optx[5]
+#res_f[i] = optf
+#res_x[i,:] = optx
+#end
 
+res_f
+res_x
+[1 ./res_x[:,1] 1 ./res_x[:,2]]
 
+cost_function_onlyopt(optx_2)
+ret
+function linspace(ini, fin, steps)
+  h = (fin - ini)/steps
+  ini:h:fin
+end
+beta = 0.05
+beta < upper[3]
 
-plot_comparar_datos(sol_full, t0_sol)
+lower[1]
+upper[1]
 
-opt_prob_full_gener = bbsetup(cost_function_full; SearchRange = (i -> (lower[i], upper[i])).(1:22), Method =:generating_set_search);
-res_full_gener = bboptimize(opt_prob_full_gener, MaxSteps=200000)
-
-cost_function_full(res_fill4.archive_output.best_candidate)
-
-p_10k_gener = [0.0287414, 8.31944e-26, 0.000388631, 1.25754e-16, 0.0176723, 0.00199379, 1.41772e-10, 2.53519e-9, 0.281396, 0.0279864, 1.3495, 0.575322, 0.01, 1.0, 0.12842, 0.974443, 0.507331, 0.549677, 4.65751, 0.00500003, 0.532661, 7.36203e-9]
-
-cost_function_full(res_full_gener.archive_output.best_candidate)
-cost_function_full()
-
-index_u0 = 1:8
-index_gamma = 9:13
-index_phi = 14:17
-index_alpha = 18:22
-
-opt_pro_full
-
-
-
-
-
-opt_s0_beta = bbsetup(cost_function_s0_beta; SearchRange = [(0.0, 1.0), (0.5, 4.0)]);
-res_s0_beta = bboptimize(opt_s0_beta, MaxSteps=50000)
-# =  [0.02650813261750469, 0.5010702132371551]
-
-prob_s0_beta = prob_generator_s0_beta(prob_cuarentena, res_s0_beta.archive_output.best_candidate)
-sol_s0_beta = solve(prob_s0_beta, saveat =saveat)
-
-prob_ini = prob_generator(prob_cuarentena,p0)
-sol_ini = solve(prob_ini, saveat = 1.0)
-
-prob_50k = prob_generator(prob_cuarentena,p_50kiter)
-sol_50k = solve(prob_50k, saveat = 1.0)
-
-prob_resfill4 = prob_generator(prob_cuarentena, res_fill4.archive_output.best_candidate)
-sol_resfill4 = solve(prob_resfill4, saveat = 1.0)
-
-prob_gener = prob_generator(prob_cuarentena, res_full_gener.archive_output.best_candidate)
-sol_gener = solve(prob_gener, saveat = 1.0)
-
-print(res_full_gener.archive_output.best_candidate)
-
-p_gener = [0.0016233880895019758, 0.0014560426461227216, 0.002695611021011668, 0.005891249636233385, 0.008012558241855715, 0.0005643108873903802, 4.64952732283368e-5, 0.0, 0.23660428119075572, 0.08866641324664376, 0.07786495396239039, 0.2082699816055291, 0.12582845530006798, 0.5, 0.85, 0.85, 0.1, 1.0, 3.1928371973424357, 0.06336951985614743, 0.6132876228791938, 0.8900988065779023]
-p_best = [0.028741048756619758, 8.319443102913642e-26, 0.0003886312559776601,1.2575447716878036e-16, 0.01766911514249089, 0.0019937916020055235,1.417716281902779e-10, 2.5351876597414255e-9,0.28139815114150907, 0.027985470987121543, 1.3507202467432848, 0.5753223814862858, 0.01, 1.0, 0.12861420208153174, 0.9744416072835304, 0.5073026067651816, 0.5496774516044536, 4.657507908020234, 0.005091244271707155, 0.5326610561546619, 5.724623617612596e-7]
-
-
-p_gener[8]
-
-cost_function_full(p_best)
-
-plot_comparar_datos(sol_ini)
-plot_comparar_datos(sol_50k)
-plot_comparar_datos(sol_gener)
-plot_comparar_datos(sol_resfill4)
-
-plot(sol_res)
-
-prob_gener.u0.x.E
-
-using Plots
-scatter(preparar_para_comparar_UCI(TS_UCI_RM, t0, t1))
+best = [0.0666772, 0.052039, 0.0751813, 0.0300008]
+best = [0.0666701, 0.0538363, 0.0753577, 0.0203948]
+best = [0.04474026684863652, 0.08503568901051466, 0.07710260395313509, 0.010061280225618025]
+optx = [0.06756594649904933, 0.1994088548461781, 0.07046334028726406, 0.0327397961308488, 66.37543309581625]
 
 
 
+xs = linspace(lower[1],upper[1], 10)
+ys = linspace(lower[2],upper[2], 10)
+zs = [cost_function_onlyopt([x,y,0.05]) for y in ys, x in xs]
+surface(xs, ys, zs)
+(upper)
 
-plot2 = plot(fechas_sol, preparar_para_comparar_UCI(sol_cuarentena, t0,t1), title = "UCI" )
 
-TS_UCI_SS_RM
+
+function add_fecha_tau!(plot, prob; fechas = false)
+  if fechas
+    vline!(plot, [Date(2020, 3, 14) + Dates.Day(floor(Int, prob.p.tau))])
+  else
+    vline!(plot, [prob.p.tau], label = :none)
+  end
+
+end
+
+optx[4]
+
+sol_onlyopt_3'
+
+sol_onlyopt'
+
+frac_outbreak_5[end,:]
+
+prob_onlyopt_3 = prob_gen_onlyopt(prob_3, optx)
+sol_onlyopt_3  = solve(prob_onlyopt_3, saveat =1.0)
+prob_onlyopt_4 = prob_gen_onlyopt(prob_4, optx)
+sol_onlyopt_4  = solve(prob_onlyopt_4, saveat =1.0)
+prob_onlyopt_5 = prob_gen_onlyopt(prob_5, optx)
+sol_onlyopt_5  = solve(prob_onlyopt_5, saveat =1.0)
+
+plot1 = plot_comparar_datos(sol, t0_sol)
+
+for a_plot in plot1.subplots add_fecha_tau!(a_plot,prob, fechas = true) end
+display(plot1)
+sol_onlyopt_5'
+
+plot2 = plot_total_all_states([sol_onlyopt_3, sol_onlyopt_4, sol_onlyopt_5], t0_sol, estados = index_estados_seii(18), nombres = nombre_estados_seii())
+
+for a_plot in plot2.subplots add_fecha_tau!(a_plot,prob_onlyopt) end
+
+savefig(plot1, output_folder * "rep_data" *  make_filename(prob.p) * extension)
+savefig(plot2, output_folder * "all_states_proy" *  make_filename(prob_onlyopt.p) * extension)
+output_folder
+plot(plot1.subplots[1], yscale = :log10)
+
+
+
+prob_onlyopt.tspan
+prob_onlyopt_2 = remake(prob_onlyopt, tspan = (0.0, 300.))
+sol_onlyopt_2  = solve(prob_onlyopt_2, saveat =1.0)
+plot_comparar_datos(sol, t0_sol)
+plot_total_all_states([sol], t0_sol, estados = index_estados_seii(18), nombres = nombre_estados_seii())
+
+# Hay diferencias ahora al cambiar las fases? Puedo lograr ese mismo resultado con otro modelo? Seguramente.
+# Pero puedo ver algo interesante en las clases sociales? En el nvl socioeconómico por ejemplo?
+
+
+plot_total_all_states([sol], t0_sol, index_clase = clase_alta, estados = index_estados_seii(18), nombres = nombre_estados_seii())
+plot_total_all_states([sol], t0_sol, index_clase = clase_media, estados = index_estados_seii(18), nombres = nombre_estados_seii())
+
+# Graficar la incidencia para los tres...
+
+MJoven = sum([594059, 618121,585855,636064,702706])
+FJoven = sum([572087, 592068, 561560, 608633, 685116])
+MAdulto = sum([742265, 645359, 595608,586674,562483,569852,499406,399562])
+FAdulto = sum([731885, 648278, 612169, 611829, 598280, 615102, 548373, 447353])
+MMayor = sum([303259, 232909, 155526, 94996, 53469, 18029, 4188, 1599])
+FMayor = sum([349743, 283000, 208063, 144450, 98332, 40854, 11668, 3171])
+
+pobla_nacional = [MJoven, FJoven, MAdulto, FAdulto, MMayor, FMayor]
+
+TS_edad_sexo
+
+
+socio_plot = plot_compare_function_of_sols_grouping(
+    [sol],
+    (clase_baja, clase_media, clase_alta),
+    incidencia_por_clase;
+    title = "Incidencia por nvl socioeconómico\n",
+    labels_grupos = ["Nvl. bajo" "Nvl. medio" "Nvl. alto"],
+    total_por_clase = data_u0.total_por_clase,
+    estado = index_cumrep(), dias = dias_outbreak[1:end-1]
+)
+savefig(socio_plot, output_folder * "incid_nvlsocio" *  filename * extension)
+
+edad_plot = plot_compare_function_of_sols_grouping(
+    [sol],
+    (joven, adulto, mayor),
+    incidencia_por_clase;
+    title = "Incidencia por edad",
+    labels_grupos = ["Joven" "Adulto" "Mayor"],
+    total_por_clase = data_u0.total_por_clase,
+    estado = index_cumrep(), dias = dias_outbreak[1:end-1]
+)
+savefig(edad_plot, output_folder * "incid_edad" *  filename * extension)
+sol_onlyopt'
+dias_outbreak
+
+plot!(socio_plot, yscale = :log10)
+
+optx
+
+
+
+
+p_test = [0.23245048012082883, 0.4989748918058404, 0.1000084160004651, 0.14740831186199518, 0.20000019801257227, 0.30000165666336853, 0.8649201746711364, 0.38444716687447594, 0.11489029390096843]
+print(res_onlyopt_2.archive_output.best_candidate)
+using Optim
+#using NLopt
+#inner_optimizer = GradientDescent()
+#results = optimize(cost_function_onlyopt, lower, upper, p_best, Fminbox(inner_optimizer))
+p_best = res_onlyopt_2.archive_output.best_candidate
+print(p_best)
+# 14285714285616494 p[2]
+p_best_1 = [0.1461583260483094, 0.07142857143834559, 0.49146565416034527, 0.09999999999963989, 0.40000000000171626, 0.7500000000005304, 0.7000000000012518, 0.1999999999981954, 0.04999999999756714, 0.1313034048044971]
+p_best_2 = [0.07142857155705251, 0.09883621089505033, 0.49756574289433786, 0.13268887536075566, 0.38000000000692887,  0.7000000015703264, 0.7000000015703264, 0.5239032162303336, 0.04999999997862783, 0.10432575973339672]
+p_best_3 = [0.16438183724824845, 0.05068548489679065, 0.4984372419195904, 0.19941277664013923, 0.21474378483263964, 0.32117105802944657, 0.7745266812338238, 0.3085262769176047, 0.04898519733784269, 0.14995717499177721] # gamas i iguales
+p_best_2
+
+
+begin
+  p_test = res_onlyopt_2.archive_output.best_candidate #[0.16438183724824845, 0.05068548489679065, 0.4984372419195904, 0.19941277664013923, 0.21474378483263964, 0.32117105802944657, 0.7745266812338238, 0.3085262769176047, 0.05] # gamas i iguales
+  #p_test[2] = 0.03
+  #p_test[2] =
+  p_test[1] = 1/7
+  p_test[3] = 0.3
+  p_test[4] = 0.01
+
+  prob_onlyopt = prob_gen_onlyopt(prob_cuarentena, p_test)
+  sol_onlyopt  = solve(prob_onlyopt, saveat =1.0)
+  #plot_comparar_datos(sol_onlyopt, t0_sol)
+  plot_total_all_states(sol_onlyopt, modelo = :seii)
+
+end
+
+p_test[4]
+
+function estado_cI(sol::DiffEqBase.DESolution; clase = 1:18)
+  φₑᵢ = sol.prob.p.phi_ei
+  S0 = sum(sol'[1, (index_susc())[clase]])
+  φₑᵢ * (S0 .- sum(sol'[:, (index_susc())[clase] ], dims = 2))
+end
+
+plot(title = "Reportados acumulados por edad")
+plot!(fechas_sol, estado_cI(sol_onlyopt, clase = 1:6), label = "Joven")
+plot!(fechas_sol, estado_cI(sol_onlyopt, clase = 7:12), label = "Adulto")
+plot!(fechas_sol, estado_cI(sol_onlyopt, clase = 13:18), label = "Mayor")
+
+plot(title = "Fallecidos por edad")
+plot!(fechas_sol[2:end], estado_nD(sol_onlyopt, clase = 1:6), label = "Joven")
+plot!(fechas_sol[2:end], estado_nD(sol_onlyopt, clase = 7:12), label = "Adulto")
+plot!(fechas_sol[2:end], estado_nD(sol_onlyopt, clase = 13:18), label = "Mayor")
+
+
 
 plot(TS_UCI_SS_RM[colnames(TS_UCI_SS_RM)[1:6]],
   labels = ["SS Central"  "SS Norte" "SS Occidente" "SS Oriente" "SS Sur" "SS Sur Oriente"],
@@ -521,20 +630,51 @@ plot_comparar_datos(sol_cuarentena, t0_sol, scale = :log10)
 
 
 
+
+a_plot = plot_comparar_datos(sol_onlyopt, t0_sol)
+
+function scatter_loss!(a_plot, loss::LossData; error = 0.05, nuevos = false)
+  if nuevos
+    scatter!(a_plot, loss.dias[2:end], nuevos_diarios(loss.data), ribbon = nuevos_diarios(loss.data)*error, msw = 0, ms = 1)
+  else
+    scatter!(a_plot, loss.dias, loss.data, ribbon = loss.data*error, msw = 0, ms = 1)
+  end
+end
+
+plot(title = "Reportados acumulados RM")
+scatter!(lossCumRep.dias, lossCumRep.data, label = :none, msw = 0, ms = 2)
+savefig(output_folder * "cumrep_RM.svg")
+
+fechas_sol = t0_sol:Dates.Day(1):dia_final_sol(sol, t0_sol)
 function plot_comparar_datos(sol, t0_sol; scale = :identity)
   fechas_sol = t0_sol:Dates.Day(1):dia_final_sol(sol, t0_sol)
+  #fechas_sol = Dates.format.(fechas_sol, "dd/mm")
 
-  plot1 = plot(fechas_sol, estado_cI(sol), title = "Reportados", yscale = scale)
-  scatter!(plot1, lossCumRep.dias, lossCumRep.data)
+  plot1 = plot(fechas_sol, estado_cI(sol), title = "Reportados acumulados", yscale = scale)
+  scatter_loss!(plot1, lossCumRep)
 
-  plot2 = plot(fechas_sol, estado_cHc(sol), title = "UCI", yscale = scale)
-  scatter!(plot2, lossCumUCI.dias, lossCumUCI.data)
+  plot1b = plot(fechas_sol[2:end], estado_nI(sol), title = "Reportados diarios", yscale = scale)
+  scatter_loss!(plot1b, lossCumRep, nuevos = true)
 
-  plot3 = plot(fechas_sol[2:end], estado_D(sol)[2:end], title = "Fallecidos acumulados", yscale = scale)
-  scatter!(plot3,lossCumDEIS.dias, lossCumDEIS.data)
+  #plot2 = plot(fechas_sol, estado_cHc(sol), title = "UCI acumulados", yscale = scale)
+  #scatter_loss!(plot2, lossCumUCI)
 
-  plot(plot1, plot2, plot3, layout = (1,3))
+  #plot2b = plot(fechas_sol, estado_Hc(sol), title = "UCI diarios", yscale = scale)
+  #scatter_loss!(plot2b, lossCumUCI, nuevos = true)
+
+  #plot3 = plot(fechas_sol[2:end], estado_D(sol)[2:end], title = "Fallecidos acumulados", yscale = scale)
+  #scatter_loss!(plot3, lossCumDEIS)
+
+  #plot3b = plot(fechas_sol[2:end], estado_nD(sol), title = "Fallecidos diarios", yscale = scale)
+  #scatter_loss!(plot3b, lossCumDEIS, nuevos = true)
+
+  plot(plot1, plot1b, legend = :none)
 end
+
+scatter(lossCumDEIS.dias, lossCumDEIS.data, ribbon = lossCumDEIS.data*0.05, msw = 0, ms = 1)
+
+plot_comparar_datos(sol, t0_sol)
+
 
 t0_sol
 plot_comparar_datos(sol_full, t0_sol)
