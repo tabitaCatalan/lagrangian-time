@@ -42,7 +42,14 @@ julia> colname_to_region_number(Symbol("6301"))
 6
 ```
 """
-colname_to_region_number(col::Symbol) = floor(Int, parse(Float64, string(col))/1000)
+function colname_to_region_number(col::Symbol)
+    str_col = string(col)
+    if occursin("_",str_col)
+        0
+    else
+        floor(Int, parse(Float64, str_col)/1000)
+    end
+end
 
 """
     indexs_RM(col_names::Vector{Symbol})
@@ -108,16 +115,16 @@ function cols_c19_RM(TS_data::TimeArray)
 end
 
 function condensar_por_edad_sexo(TS_GE::TimeArray, TS_rep::TimeArray)
+    #cumTS_rep = cumsum(TS_rep, dims = 1)
+    #frac_rep_RM_del_total = (cumTS_rep[Symbol("Metropolitana")] ./ cumTS_rep[Symbol("Total")])[2:end]
 
-    frac_rep_RM_del_total = (TS_rep[Symbol("Metropolitana")] ./ TS_rep[Symbol("Total")])[2:end]
+    #t0 = max(timestamp(TS_GE)[1], timestamp(frac_rep_RM_del_total)[1])
+    #tf = min(timestamp(TS_GE)[end], timestamp(frac_rep_RM_del_total)[end])
 
-    t0 = max(timestamp(TS_GE)[1], timestamp(frac_rep_RM_del_total)[1])
-    tf = min(timestamp(TS_GE)[end], timestamp(frac_rep_RM_del_total)[end])
+    #tiempos_validos = timestamp(TS_GE[t0:Dates.Day(1):tf])
 
-    tiempos_validos = timestamp(TS_GE[t0:Dates.Day(1):tf])
-
-    TS_GE_corta = TS_GE[tiempos_validos]
-    TS_frac_corta = frac_rep_RM_del_total[tiempos_validos]
+    TS_GE_corta = TS_GE #[tiempos_validos]
+    #TS_frac_corta = frac_rep_RM_del_total[tiempos_validos]
 
     joven = 1:5; adulto = 6:13; mayor = 14:17
     hombre = 0; mujer = 1
@@ -139,20 +146,35 @@ function condensar_por_edad_sexo(TS_GE::TimeArray, TS_rep::TimeArray)
         col_names_condensed[clase] = Str_sexo[j] * Str_edad[i]
     end
 
-    condensed_reescaled = condensed .* values(TS_frac_corta)
+    #condensed_reescaled = condensed .* values(TS_frac_corta)
 
-    TS_condensed = TimeArray(timestamp(TS_GE), condensed_reescaled, Symbol.(col_names_condensed))
+    TS_condensed = TimeArray(timestamp(TS_GE), condensed, Symbol.(col_names_condensed))
 
     TS_condensed
 end
 
+function parse_semana_epi(str_semana)
+    # str_number de la forma "SE1", "SE15"
+    numero_semana = parse(Int, str_semana[3:end])
+    dia_SE1 = Date(2020,01,04)
+    dia_SE = dia_SE1 + Dates.Day((numero_semana - 1)*7)
+    dia_SE
+end
+
 
 minsal_folder = "C:\\Users\\Tabita\\Documents\\Covid\\Datos-COVID19-MINSAL\\output\\"
-DEIS_data = "producto50\\DefuncionesDEISPorComuna_T.csv"
+DEIS_data = "producto50\\DefuncionesDEIS_confirmadosPorComuna_T.csv"
 reportados_data = "producto26\\CasosNuevosConSintomas_T.csv"
 UCI_data_SS = "producto48\\SOCHIMI_T.csv"
 UCI_data = "producto8\\UCI_T.csv"
 GE_data = "producto16\\CasosGeneroEtario_T.csv"
+rep_por_comuna_data = "producto15\\FechaInicioSintomas_T.csv"
+
+
+
+TS_nuevos_comuna = TimeArray(CSV.File(minsal_folder * rep_por_comuna_data, header = 4, datarow = 6), timestamp = Symbol("Codigo comuna"), timeparser = parse_semana_epi)
+
+TS_nuevos_comuna_RM = TS_nuevos_comuna[colnames(TS_nuevos_comuna)[colname_to_region_number.(colnames(TS_nuevos_comuna)) .== 13]]
 
 TS_UCI = TimeArray(CSV.File( minsal_folder * UCI_data, header = 2, datarow = 4),
     timestamp = Symbol("Codigo region"))
@@ -180,6 +202,10 @@ TS_GE = TimeArray(CSV.File( minsal_folder * GE_data,
 )
 TS_edad_sexo = condensar_por_edad_sexo(TS_GE, TS_reportados)
 
+plot(TS_edad_sexo, title = "Casos por género y grupo etario")
+
+
+
 
 TS_UCI_SS = TimeArray(
     CSV.File(minsal_folder * UCI_data_SS,
@@ -187,10 +213,45 @@ TS_UCI_SS = TimeArray(
     ), timestamp = Symbol("Servicio salud_Serie")
 )
 
-TS_UCI_SS_RM = TS_UCI_SS[cols_c19_RM(TS_UCI_SS)]
+TS_UCI_SS_RM = TS_UCI_SS[cols_c19_RM(TS_UCI_SS)];
 #=
 TS_UCI_Vis = TimeArray(
     CSV.File( "..\\..\\data\\PacientesCovid-19UCIanivel_Visualizador.csv",
         transpose=true,
     ), timestamp = Symbol("nombre")
-)=#
+)
+plot(TS_nuevos_comuna_RM)
+
+
+es_tramo(col, tramo)
+TS_nuevos_comuna_RM
+1e5
+comunas
+indexin(13502, comunas.id_comuna)
+find_index_comuna = cod -> findfirst(comunas.id_comuna .== cod)
+tramos = comunas.tramo_pobreza[find_index_comuna.(parse.(Int, string.(colnames(TS_nuevos_comuna_RM))))]
+pobla = [sum(comunas.poblacion_total[comunas.tramo_pobreza .== i]) for i in 1:3]
+plot(title = "Incidencia real por nivel socioeconómico")
+plot!(cumsum(sum(TS_nuevos_comuna_RM[colnames(TS_nuevos_comuna_RM)[tramos .== 1]], dims = 2), dims = 1)[4:end] .* (1e5/pobla[1]), label = "Nvl Bajo")
+plot!(cumsum(sum(TS_nuevos_comuna_RM[colnames(TS_nuevos_comuna_RM)[tramos .== 2]], dims = 2), dims = 1)[4:end] .* (1e5/pobla[2]), label = "Nvl Medio")
+plot!(cumsum(sum(TS_nuevos_comuna_RM[colnames(TS_nuevos_comuna_RM)[tramos .== 3]], dims = 2), dims = 1)[4:end] .* (1e5/pobla[3]), label = "Nvl Alto")
+ylabel!("Casos por 100.000 habitantes")
+
+savefig(output_folder * "incid_nvlsocio_real" * extension)
+
+plot(frac_outbreak)
+plot(TS_reportados.Total)
+plot!(TS_reportados.Metropolitana)
+plot(TS_edad_sexo, yscale = :log10)
+
+
+plot(title = "Incidencia real por grupo etario")
+plot!(1e5 .* sum(TS_edad_sexo[[:MJoven, :FJoven]], dims = 2)./ sum(pobla_nacional[1:2]), label = "Joven")
+plot!(1e5 .* sum(TS_edad_sexo[[:MAdulto, :FAdulto]], dims = 2)./ sum(pobla_nacional[3:4]), label = "Adulto")
+plot!(1e5 .* sum(TS_edad_sexo[[:MMayor, :FMayor]], dims = 2)./ sum(pobla_nacional[5:6]), label = "Mayor")
+ylabel!("Casos por 100.000 habitantes")
+savefig(output_folder * "incid_edad_real" * extension)
+
+
+plot(values(sum(TS_edad_sexo[[:MJoven, :FJoven]], dims = 2))./ sum(data_u0.total_por_clase[joven]), label = "Joven")
+=# 
