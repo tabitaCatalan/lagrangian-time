@@ -103,6 +103,7 @@ struct ModelParam{T}
     # podría añadir restricciones de integridad como que phi ∈ [0,1]
     # falta un parametro para el lambda
     lambda_param::LambdaParam{T}
+    tau::T
 end
 
 
@@ -175,15 +176,50 @@ function matrix_ponderation!(P, P_normal, P_cuarentena, frac_cuarentena_por_clas
     mapping = @SArray [1,1,2,2,3,3,1,1,2,2,3,3,1,1,2,2,3,3] # 0.000022 seconds  (4 allocations: 6.062 KiB)
     # mapping = [1,1,2,2,3,3,1,1,2,2,3,3,1,1,2,2,3,3] # 0.000017 seconds (7 allocations: 6.719 KiB)
     P .= frac_cuarentena_por_clase[mapping] .* P_cuarentena + (1 .- frac_cuarentena_por_clase[mapping]) .* P_normal
+    #P .= P_cuarentena
+end
+
+function P_t!(P, u::MyDataArray, t)
+    matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t)+1, :])
 end
 
 function make_model_param(p)
-  ModelParam(p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], LambdaParam(p[10], p[11], p[12], p[13], p[14]))
+  ModelParam(p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], LambdaParam(p[10], p[11], p[12], p[13], p[14]), p[15])
 end
 
 function make_model_param(p_mod, p_lb)
     ModelParam(p_mod[1], p_mod[2], p_mod[3], p_mod[4], p_mod[5], p_mod[6], p_mod[7], p_mod[8], p_mod[9], LambdaParam(p_lb[1], p_lb[2], p_lb[3], p_lb[4], p_lb[5]))
 end
+
+"""
+    seii!(du,u,p,t)
+Modelo epidemiológico tipo SEIIcI
+# Arguments
+- `du::MyDataArray{Float64}`:
+- `u::MyDataArray{Float64}`
+- `p::ModelParam`
+- `t`:
+"""
+function seii!(du::MyDataArray,u::MyDataArray,p::ModelParam,t)
+    # Extraer parametros
+    γₑ = p.gamma_e; γᵢ = p.gamma_i; γᵢₘ = p.gamma_im
+
+    φₑᵢ = p.phi_ei
+
+    # Calcular parametros a tiempo t
+    P_t!(du.P_normal, u::MyDataArray, t)
+    #print(sum(du.P_normal[:,9]))
+    λ = Array{Float64, 1}(undef, size(u.P_normal)[1])
+    calcular_lambda!(λ, p.lambda_param, du.P_normal, u,t)
+    #calcular_lambda!(λ, p.lambda_param, u.P_normal , u)
+    # Calcular derivada
+    du.x.S  = -λ .* u.x.S
+    du.x.E  = λ .* u.x.S - γₑ * u.x.E
+    du.x.I  = φₑᵢ * γₑ * u.x.E - γᵢ * u.x.I
+    du.x.Im = (1.0 - φₑᵢ) * γₑ * u.x.E - γᵢₘ * u.x.Im
+    du.x.cI = φₑᵢ * γₑ * u.x.E
+end;
+
 
 """
     seiirhhd!(du,u,p,t)
@@ -199,10 +235,15 @@ function seiirhhd!(du,u,p::ModelParam,t)
     #p = make_model_param(p_vec[1], p_vec[2])
     γₑ = p.gamma_e; γᵢ = p.gamma_i; γᵢₘ = p.gamma_im
     γₕ = p.gamma_h; γₕ_c = p.gamma_hc
-    φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d;
+
+    map_edad = @SArray [1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3]
+    letalidad_por_edad = @SArray [0.09797857224999705, 0.8914895549589552, 6.762791480516708]
+
+    φₑᵢ = p.phi_ei; φᵢᵣ = p.phi_ir; φₕᵣ = p.phi_hr; φ_d = p.phi_d * letalidad_por_edad[map_edad];
+
     # Calcular parametros a tiempo t
     P = similar(u.P_normal)
-    matrix_ponderation!(P, u.P_normal, u.P_cuarentena, u.frac_pobla_cuarentena[floor(Int,t)+1, :])
+    P_t!(P, u::MyDataArray, t)
     λ = Array{Float64, 1}(undef, size(u.P_normal)[1])
     calcular_lambda!(λ, p.lambda_param, P, u)
     # Calcular derivada
@@ -211,9 +252,9 @@ function seiirhhd!(du,u,p::ModelParam,t)
     du.x.I  = φₑᵢ * γₑ * u.x.E - γᵢ * u.x.I
     du.x.Im = (1.0 - φₑᵢ) * γₑ * u.x.E - γᵢₘ * u.x.Im
     du.x.R  = γᵢₘ * u.x.Im + φᵢᵣ * γᵢ * u.x.I + φₕᵣ * γₕ * u.x.H
-    du.x.H = (1.0 - φᵢᵣ) * γᵢ * u.x.I + (1.0 - φ_d) * γₕ_c * u.x.Hc - γₕ * u.x.H
+    du.x.H = (1.0 - φᵢᵣ) * γᵢ * u.x.I + (1.0 .- φ_d) .* (γₕ_c * u.x.Hc) - γₕ * u.x.H
     du.x.Hc = (1.0 - φₕᵣ) * γₕ * u.x.H - γₕ_c * u.x.Hc
-    du.x.D = φ_d * γₕ_c * u.x.Hc
+    du.x.D = φ_d .* (γₕ_c * u.x.Hc)
 end;
 
 
@@ -238,15 +279,23 @@ p_E
 - `P`: matrix de tiempos de residencia.
 - `u:MyDataArray`: estado actual del sistema.
 """
-function calcular_lambda!(λ, lambda_param::LambdaParam{Float64}, P, u::MyDataArray{Float64})
-    α = lambda_param.alpha; β = lambda_param.beta .* get_riesgos()
+function calcular_lambda!(λ, lambda_param::LambdaParam, P, u::MyDataArray,t)
+    α = lambda_param.alpha; β = lambda_param.beta # τ = 92
+    beta_coef = (((β - α)/π) * atan( 0.5*(t-71.)) .+ (β + α)/2)
+    if t > 290
+        beta_coef *= 2
+    end
+
+
+    B = beta_coef .* get_riesgos()
     pₑ = lambda_param.p_E; pᵢ = lambda_param.p_I; pᵢₘ = lambda_param.p_Im
-    S = u.x.S; E = u.x.E; I = u.x.I; Iᵐ = u.x.Im; R = u.x.R;
-    H = u.x.H; Hc = u.x.Hc; D = u.x.D;
+    S = u.x.S; E = u.x.E; I = u.x.I; Iᵐ = u.x.Im;# R = u.x.R;
+    #H = u.x.H; Hc = u.x.Hc; D = u.x.D;
     hogar = 1
-    N = S + E + I + Iᵐ + R + H + Hc + D
-    λ .= P*(β .* ( pₑ*(P' * E)./(P' * N) + pᵢₘ*(P' * Iᵐ)./(P' * N) ))
-    λ .+= (β[1]*(sum(I)/sum(N))) .* P[:,hogar]
+    N = u.total_por_clase # S + E + I + Iᵐ + R + H + Hc + D
+    #λ .= P*(β .* ( pₑ*(P' * E)./(P' * N) + pᵢₘ*(P' * Iᵐ)./(P' * N) ))
+    λ .= P*(B .* ( P' * (pₑ * E + pᵢₘ * Iᵐ))./(P' * N) )
+    #λ .+= (β[1]*(sum(I)/sum(N))) .* P[:,hogar]
 end
 
 """
@@ -283,11 +332,26 @@ function set_up_inicial_conditions(total_por_clase)
     h0 = (40/n_clases)*ones(n_clases)
     hc0 = (4/n_clases)*ones(n_clases)
     d0 = zeros(n_clases) #(2/n_clases)*ones(n_clases)
-    s0 = total_por_clase - e0
+    s0 = total_por_clase - e0 - i0 - im0 - r0 - h0 - hc0 - d0
 
     u0 = ComponentArray(S = s0, E = e0, Im = im0, I = i0, R = r0, H = h0, Hc = hc0, D = d0)
     return u0
 end
+
+function set_up_inicial_seii(total_por_clase, p::ModelParam, χ)
+    n_clases = length(total_por_clase)
+    e0_total = χ[3]*χ[2]/(p.phi_ei * p.gamma_e)
+    e0 = e0_total * total_por_clase/sum(total_por_clase)
+    i0 = zeros(n_clases)#(174/n_clases)*ones(n_clases) #10*ones(n_clases)
+    im0_total = e0_total * (1. - p.phi_ei)*p.gamma_e/(χ[2] + p.gamma_im)
+    im0 = im0_total * total_por_clase/sum(total_por_clase) #100*ones(n_clases)
+    ci0 = zeros(n_clases)
+    s0 = total_por_clase - e0 - i0 - im0
+
+    u0 = ComponentArray(S = s0, E = e0, Im = im0, I = i0, cI = ci0)
+    return u0
+end
+
 
 """
     set_up_parameters(a, beta, gi, gm, phi, nu)
@@ -344,6 +408,8 @@ function get_riesgos()
     #return [0.1, 0.5, 0.7, 0.7, 0.5, 0.5, 0.7, 0.7, 1.0, 0.1, 0.4, 0.1, 0.1]
     # Version con numero de contactos
     return [1, 10, 30, 20, 5, 10, 40, 50, 80, 2, 2, 2, 5]
+    #return [1,  3,  6,  5,  2, 3, 2, 10, 8, 1, 1, 1, 2]
+    #return ones(13)
 end
 
 function get_riesgos!(beta)
