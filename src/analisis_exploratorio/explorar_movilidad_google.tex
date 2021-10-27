@@ -1,0 +1,210 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[a4paper,text={16.5cm,25.2cm},centering]{geometry}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1.2ex}
+
+\hypersetup
+       {   pdfauthor = { Tabita Catalán },
+           pdftitle={ Análisis exploratorio de los datos de movilidad de Google },
+           colorlinks=TRUE,
+           linkcolor=black,
+           citecolor=blue,
+           urlcolor=blue
+       }
+
+\title{ Análisis exploratorio de los datos de movilidad de Google }
+
+\author{ Tabita Catalán }
+
+\date{ 29 de octubre de 2020 }
+
+\usepackage{upquote}
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    upquote=true,
+    breaklines=true,
+    breakindent=0pt,
+    keepspaces=true,
+    showspaces=false,
+    columns=fullflexible,
+    showtabs=false,
+    showstringspaces=false,
+    escapeinside={(*@}{@*)},
+    extendedchars=true,
+}
+\newcommand{\HLJLt}[1]{#1}
+\newcommand{\HLJLw}[1]{#1}
+\newcommand{\HLJLe}[1]{#1}
+\newcommand{\HLJLeB}[1]{#1}
+\newcommand{\HLJLo}[1]{#1}
+\newcommand{\HLJLk}[1]{\textcolor[RGB]{148,91,176}{\textbf{#1}}}
+\newcommand{\HLJLkc}[1]{\textcolor[RGB]{59,151,46}{\textit{#1}}}
+\newcommand{\HLJLkd}[1]{\textcolor[RGB]{214,102,97}{\textit{#1}}}
+\newcommand{\HLJLkn}[1]{\textcolor[RGB]{148,91,176}{\textbf{#1}}}
+\newcommand{\HLJLkp}[1]{\textcolor[RGB]{148,91,176}{\textbf{#1}}}
+\newcommand{\HLJLkr}[1]{\textcolor[RGB]{148,91,176}{\textbf{#1}}}
+\newcommand{\HLJLkt}[1]{\textcolor[RGB]{148,91,176}{\textbf{#1}}}
+\newcommand{\HLJLn}[1]{#1}
+\newcommand{\HLJLna}[1]{#1}
+\newcommand{\HLJLnb}[1]{#1}
+\newcommand{\HLJLnbp}[1]{#1}
+\newcommand{\HLJLnc}[1]{#1}
+\newcommand{\HLJLncB}[1]{#1}
+\newcommand{\HLJLnd}[1]{\textcolor[RGB]{214,102,97}{#1}}
+\newcommand{\HLJLne}[1]{#1}
+\newcommand{\HLJLneB}[1]{#1}
+\newcommand{\HLJLnf}[1]{\textcolor[RGB]{66,102,213}{#1}}
+\newcommand{\HLJLnfm}[1]{\textcolor[RGB]{66,102,213}{#1}}
+\newcommand{\HLJLnp}[1]{#1}
+\newcommand{\HLJLnl}[1]{#1}
+\newcommand{\HLJLnn}[1]{#1}
+\newcommand{\HLJLno}[1]{#1}
+\newcommand{\HLJLnt}[1]{#1}
+\newcommand{\HLJLnv}[1]{#1}
+\newcommand{\HLJLnvc}[1]{#1}
+\newcommand{\HLJLnvg}[1]{#1}
+\newcommand{\HLJLnvi}[1]{#1}
+\newcommand{\HLJLnvm}[1]{#1}
+\newcommand{\HLJLl}[1]{#1}
+\newcommand{\HLJLld}[1]{\textcolor[RGB]{148,91,176}{\textit{#1}}}
+\newcommand{\HLJLs}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsa}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsb}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsc}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsd}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsdB}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsdC}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLse}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLsh}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsi}[1]{#1}
+\newcommand{\HLJLso}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLsr}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLss}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLssB}[1]{\textcolor[RGB]{201,61,57}{#1}}
+\newcommand{\HLJLnB}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLnbB}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLnfB}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLnh}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLni}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLnil}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLnoB}[1]{\textcolor[RGB]{59,151,46}{#1}}
+\newcommand{\HLJLoB}[1]{\textcolor[RGB]{102,102,102}{\textbf{#1}}}
+\newcommand{\HLJLow}[1]{\textcolor[RGB]{102,102,102}{\textbf{#1}}}
+\newcommand{\HLJLp}[1]{#1}
+\newcommand{\HLJLc}[1]{\textcolor[RGB]{153,153,119}{\textit{#1}}}
+\newcommand{\HLJLch}[1]{\textcolor[RGB]{153,153,119}{\textit{#1}}}
+\newcommand{\HLJLcm}[1]{\textcolor[RGB]{153,153,119}{\textit{#1}}}
+\newcommand{\HLJLcp}[1]{\textcolor[RGB]{153,153,119}{\textit{#1}}}
+\newcommand{\HLJLcpB}[1]{\textcolor[RGB]{153,153,119}{\textit{#1}}}
+\newcommand{\HLJLcs}[1]{\textcolor[RGB]{153,153,119}{\textit{#1}}}
+\newcommand{\HLJLcsB}[1]{\textcolor[RGB]{153,153,119}{\textit{#1}}}
+\newcommand{\HLJLg}[1]{#1}
+\newcommand{\HLJLgd}[1]{#1}
+\newcommand{\HLJLge}[1]{#1}
+\newcommand{\HLJLgeB}[1]{#1}
+\newcommand{\HLJLgh}[1]{#1}
+\newcommand{\HLJLgi}[1]{#1}
+\newcommand{\HLJLgo}[1]{#1}
+\newcommand{\HLJLgp}[1]{#1}
+\newcommand{\HLJLgs}[1]{#1}
+\newcommand{\HLJLgsB}[1]{#1}
+\newcommand{\HLJLgt}[1]{#1}
+
+
+\begin{document}
+
+\maketitle
+
+\section{Introducción}
+Google ha puesto a disposición de la comunidad datos anonimizados que usan en Google Maps, con el fin de ayudar en la toma de decisiones relacionadas a la pandemia por Covid-19. Estos datos están disponibles durante el desarrollo de la pandemia \href{https://www.google.com/covid19/mobility/}{aquí}.
+
+Se estudia los datos de Chile correspondientes a la Región Metropolitana de Santiago. El archivo usado es \texttt{MovilidadGoogleSantiago.csv}, en la carpeta \href{../../data/}{data}.
+
+\section{Leer los datos}
+Usaremos el paquete \textbf{TimeSeries.jl}. Leemos los datos y los graficamos.
+
+
+\begin{lstlisting}
+(*@\HLJLk{using}@*) (*@\HLJLn{TimeSeries}@*)(*@\HLJLp{,}@*) (*@\HLJLn{Plots}@*)
+
+(*@\HLJLn{csv{\_}cuarentena}@*) (*@\HLJLoB{=}@*) (*@\HLJLs{"{}..}@*)(*@\HLJLse{{\textbackslash}{\textbackslash}}@*)(*@\HLJLs{..}@*)(*@\HLJLse{{\textbackslash}{\textbackslash}}@*)(*@\HLJLs{data}@*)(*@\HLJLse{{\textbackslash}{\textbackslash}}@*)(*@\HLJLs{MovilidadGoogleSantiago.csv"{}}@*)
+(*@\HLJLn{mov{\_}google}@*) (*@\HLJLoB{=}@*) (*@\HLJLnf{readtimearray}@*)(*@\HLJLp{(}@*)(*@\HLJLn{csv{\_}cuarentena}@*)(*@\HLJLp{;}@*) (*@\HLJLn{delim}@*) (*@\HLJLoB{=}@*) (*@\HLJLsc{{\textquotesingle},{\textquotesingle}}@*)(*@\HLJLp{)}@*)
+(*@\HLJLn{numero{\_}dias}@*) (*@\HLJLoB{=}@*) (*@\HLJLnf{length}@*)(*@\HLJLp{(}@*)(*@\HLJLnf{timestamp}@*)(*@\HLJLp{(}@*)(*@\HLJLn{mov{\_}google}@*)(*@\HLJLp{))}@*)
+
+(*@\HLJLnf{plot}@*)(*@\HLJLp{(}@*)(*@\HLJLn{mov{\_}google}@*)(*@\HLJLp{[}@*)(*@\HLJLsc{:recreacion}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:compras}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:parques}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:transporte}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:trabajo}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:hogar}@*)(*@\HLJLp{])}@*)
+\end{lstlisting}
+
+\includegraphics[width=\linewidth]{jl_XUwDlz/explorar_movilidad_google_1_1.svg}
+
+\subsection{Correción de la línea base}
+Notamos que la movilidad de referencia considerada era el promedio de las 5 semanas entre el 3 de enero y el 6 de febrero. Esa no es una buena línea de referencia para Chile, puesto que esa fecha corresponde a las vacaciones. Para corregirlo hacemos lo siguiente:
+
+Supongamos lo siguiente:
+
+\begin{itemize}
+\item La línea base es alguna cantidad desconocida $x_0$ correspondiente a un día 0.
+
+
+\item Se conoce $p_i$, el porcentaje de variación de esa cantidad, correspondiente al día $i$, de tal manera que $x_i = (1+ \frac{p_i}{100})x_0$. Notamos que, puesto que no conocemos $x_0$, tampoco conocemos $x_i$.
+
+\end{itemize}
+Nos interesa encontrar valores $p_i'$ que sean variaciones con respecto a una nueva línea base $x_0'$, es decir, que $x_i = (1+\frac{p_i'}{100})x_0'$. Si suponemos que conocemos $p$ tal que $x_0' = (1+\frac{p}{100})x_0$, entonces un cálculo simple
+
+\[
+x_i = \left(1+ \frac{p_i}{100}\right)x_0
+= \frac{1+ \frac{p_i}{100}}{1+ \frac{p}{100}} x_0'
+= \left( 1 + \frac{\frac{p_i - p}{100}}{1 + \frac{p}{100}}\right)x_0' = \left(1 + \frac{1}{100} \cdot \frac{p_i - p}{1 + \frac{p}{100}}\right) x_0'
+\]
+nos dice que $p_i' = \frac{p_i-p}{1+\frac{p}{100}}.$
+
+Los valores base usados fueron el promedio de la semana del 9-15 de marzo; la única normal. Solo se consideraron los días laborales (lunes-viernes).
+
+La siguiente tabla muestra los porcentajes de variación con respecto al valor desconocido de enero-febrero.
+
+
+\begin{lstlisting}
+(*@\HLJLnB{julia>}@*) (*@\HLJLn{mov{\_}google}@*)(*@\HLJLp{[}@*)(*@\HLJLni{24}@*)(*@\HLJLoB{:}@*)(*@\HLJLni{28}@*)(*@\HLJLp{]}@*)
+5×6 TimeArray(*@{{\{}}@*)Float64,2,Date,Array(*@{{\{}}@*)Float64,2(*@{{\}}}@*)(*@{{\}}}@*) 2020-03-09 to 2020-03-13
+│            │ recreacion │ compras │ parques │ transporte │ trabajo │ hogar │
+├────────────┼────────────┼─────────┼─────────┼────────────┼─────────┼───────┤
+│ 2020-03-09 │ 1.0        │ 12.0    │ 17.0    │ 9.0        │ 14.0    │ 0.0   │
+│ 2020-03-10 │ 3.0        │ 11.0    │ 7.0     │ 12.0       │ 16.0    │ -2.0  │
+│ 2020-03-11 │ -3.0       │ 6.0     │ 10.0    │ 12.0       │ 14.0    │ 0.0   │
+│ 2020-03-12 │ 0.0        │ 10.0    │ 5.0     │ 10.0       │ 15.0    │ -1.0  │
+│ 2020-03-13 │ 0.0        │ 15.0    │ 5.0     │ 6.0        │ 15.0    │ 0.0   │
+\end{lstlisting}
+
+Calculamos los promedios para cada columna
+
+
+\begin{lstlisting}
+(*@\HLJLn{p}@*) (*@\HLJLoB{=}@*) (*@\HLJLnf{values}@*)(*@\HLJLp{(}@*)(*@\HLJLnf{sum}@*)(*@\HLJLp{(}@*)(*@\HLJLn{mov{\_}google}@*)(*@\HLJLp{[}@*)(*@\HLJLni{24}@*)(*@\HLJLoB{:}@*)(*@\HLJLni{28}@*)(*@\HLJLp{])}@*) (*@\HLJLoB{./}@*)(*@\HLJLni{5}@*)(*@\HLJLp{)}@*)
+\end{lstlisting}
+
+\begin{lstlisting}
+1(*@\ensuremath{\times}@*(6 Array(*@{{\{}}@*)Float64,2(*@{{\}}}@*):
+ 0.2  10.8  8.8  9.8  14.8  -0.6
+\end{lstlisting}
+
+
+Esto nos permite corregir los datos.
+
+
+\begin{lstlisting}
+(*@\HLJLn{mov{\_}google{\_}corregido}@*) (*@\HLJLoB{=}@*) (*@\HLJLp{(}@*)(*@\HLJLn{mov{\_}google}@*) (*@\HLJLoB{.-}@*) (*@\HLJLn{p}@*)(*@\HLJLp{)}@*) (*@\HLJLoB{./}@*)(*@\HLJLp{(}@*)(*@\HLJLni{1}@*) (*@\HLJLoB{.+}@*) (*@\HLJLn{p}@*)(*@\HLJLoB{./}@*)(*@\HLJLni{100}@*)(*@\HLJLp{)}@*)
+(*@\HLJLnf{plot}@*)(*@\HLJLp{(}@*)(*@\HLJLn{mov{\_}google{\_}corregido}@*)(*@\HLJLp{[}@*)(*@\HLJLsc{:recreacion}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:compras}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:parques}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:transporte}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:trabajo}@*)(*@\HLJLp{,}@*) (*@\HLJLsc{:hogar}@*)(*@\HLJLp{])}@*)
+\end{lstlisting}
+
+\includegraphics[width=\linewidth]{jl_XUwDlz/explorar_movilidad_google_4_1.svg}
+
+
+\end{document}
