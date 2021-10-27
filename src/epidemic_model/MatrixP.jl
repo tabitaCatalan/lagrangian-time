@@ -24,7 +24,7 @@ P, total_por_clase, nombre_ambientes, nombre_clases = read_matlab_data("..\\resu
 """
 function read_matlab_data(mat_filename)
     Pdata = matopen(mat_filename)
-    names(Pdata)
+    keys(Pdata)
     P = read(Pdata, "P")
     total_por_clase = vec(read(Pdata, "total_por_clase"))
     nombre_ambientes = read(Pdata, "ambientes")
@@ -106,10 +106,21 @@ function aplicar_cuarentena!(P)
     reducir_tiempo_estudios!(P)
 
     # Otros ambientes
-    recreacion = 8; visitas = 5; compras = 4
-    reducir_tpo_en_ambiente!(P, recreacion, 95)
-    reducir_tpo_en_ambiente!(P, visitas, 95)
+    recreacion = 8; visitas = 5; compras = 4; salud = 6; tramites = 7
+    #reducir_tpo_en_ambiente!(P, recreacion, 95)
+    reducir_tpo_en_amb_por_nvlsocio!(P, recreacion, (80, 85, 95))
+    reducir_tpo_en_amb_por_nvlsocio!(P, visitas, (80, 85, 95))
+    #reducir_tpo_en_amb_por_nvlsocio!(P, compras  (75, 85, 95))
+    #reducir_tpo_en_ambiente!(P, visitas, 95)
     reducir_tpo_en_ambiente!(P, compras, 40)
+    reducir_tpo_en_ambiente!(P, salud, 60)
+    reducir_tpo_en_ambiente!(P, tramites, 30)
+
+    #=reducir_tpo_en_ambiente!(P, recreacion, 98)
+    reducir_tpo_en_ambiente!(P, visitas, 98)
+    reducir_tpo_en_ambiente!(P, compras, 60)
+    reducir_tpo_en_ambiente!(P, salud, 90)
+    reducir_tpo_en_ambiente!(P, tramites, 80)=#
 
 
     corregir_tiempo_transporte!(P, δ)
@@ -201,6 +212,17 @@ function reducir_tpo_en_ambiente!(P, ambiente, p100_reduccion)
     P[:,ambiente] *= (100 - p100_reduccion)/100
 end
 
+function reducir_tpo_en_amb_por_nvlsocio!(P, ambiente, p100_red_por_nvlsocio)
+    hogar = 1
+    indexs_nvl_socio = index_clases()
+    for nvlsocio in 1:3
+        index_nvlsocio = indexs_nvl_socio[nvlsocio]
+        P[index_nvlsocio,hogar] += (p100_red_por_nvlsocio[nvlsocio]/100) *P[index_nvlsocio,ambiente]
+        P[index_nvlsocio,ambiente] *= (100 - p100_red_por_nvlsocio[nvlsocio])/100
+    end
+end
+
+
 """
     reducir_tiempo_estudios!(P)
 Modifica una matriz de tiempos de residencia, disminuyendo el tiempo en el ambiente
@@ -229,8 +251,6 @@ function reducir_tiempo_transporte!(P)
     end
 end
 
-v_p100s = Dict{Int,Vector{Float64}}(1 => [0.1,0.5,0.8], 5=> [-0.1,0.4,0.6])
-
 
 
 """
@@ -253,13 +273,10 @@ end
 
 function map_class_index(i)
     if i == 1
-        index = clase_baja()
+        return clase_baja
     elseif i == 2
-        index = clase_media()
+        return clase_media
     elseif i == 3
-        index = clase_alta()
-    else
-        index = []
+        return clase_alta
     end
-    index
 end
