@@ -1,0 +1,44 @@
+# Incidencia en los distintos grupos etarios
+
+En lo que sigue, usaremos la siguiente terminología:
+
+Grupo etario | Edades asociadas
+--- | ---
+Joven   | de 0 a 24 años
+Adulto  | de 25 a 64 años
+Mayor | 65 años o más
+
+## Población: datos del CENSO 2017
+Los datos del [Censo 2017](http://resultados.censo2017.cl/) dicen que la población
+de cada uno de estos grupos, separados además por sexo, son los siguientes:
+
+```{julia, term=true}
+include("ReadCuarentenaData.jl")
+poblacion_db_file = "data\\poblacion\\poblacion.db"
+query_file = "data\\poblacion\\edades.sql"
+poblacion = read_db(poblacion_db_file, query_file)
+
+pobla_grupos = [poblacion.total_hombres[1], poblacion.total_mujeres[1],
+                poblacion.total_hombres[2], poblacion.total_mujeres[2],
+                poblacion.total_hombres[3], poblacion.total_mujeres[3]]
+```
+
+Grupo etario  | Hombres | Mujeres
+--- | --- | ---
+adulto  | 4.601.209 | 4.813.269
+joven   | 3.136.805 | 3.019.464
+mayor   | 863.975  | 1.139.281
+
+## Casos por género y grupo etario
+Usamos el [DP16: Casos por genero y grupo de edad](https://github.com/MinCiencia/Datos-COVID19/tree/master/output/producto16).
+Este producto registra el número acumulado de casos confirmados distribuidos por género y grupo de edad, a nivel nacional.
+Cargamos los datos agrupados por edad y sexo.
+
+```julia
+include("LoadMinsalData.jl")
+plot(TS_edad_sexo, title = "Casos a nivel nacional, por edad y sexo")
+plot(TS_edad_sexo ./ pobla_grupos',
+    title = "Casos dividido por población de cada grupo"
+)
+```
+Si dividimos por la población de cada grupo se obtiene.
