@@ -3,3 +3,7 @@
 *.asv
 *.mexw64
 data/valparaiso
+src/analisis_exploratorio/jl_*
+*.aux
+*.log
+*.out
