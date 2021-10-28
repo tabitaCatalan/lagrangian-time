@@ -1,7 +1,14 @@
 %% Script para construccion de matriz P
-% Autor: Tabita Catalán
-%% Parámetros
-% El usuario debe definir algunos parámetros.
+% Autor: Tabita Catalï¿½n
+
+%% Requerimientos
+% |sqlite3| debe estar en el PATH de Matlab.
+% Obtener de <https://www.mathworks.com/matlabcentral/fileexchange/68298-sqlite3>
+
+addpath('C:\Users\Tabita\Documents\MATLAB\sqlite3') % path a sqlite3
+
+%% Parï¿½metros
+% El usuario debe definir algunos parï¿½metros.
 %
 % |considerar_nvl_socioecono| dice si la matriz P incluye el criterio del
 % nivel socioeconomico. Si es |false|, solo considera edad y sexo. Si es
@@ -43,16 +50,16 @@ modo_normalizacion = 0;
     considerar_nvl_socioecono, considerar_no_viajeros, restar_horas_sueno, ...
     modo_normalizacion, tipo_nvl_socio);
 %% Visualizacion
-% Tambien hay algunos parámetros definidos por el usuario para graficar la
+% Tambien hay algunos parï¿½metros definidos por el usuario para graficar la
 % matriz resultante.
 %
 % Si |tomar_log| es |true|, entonces se grafica $\log_2{P}$ en lugar de $P$.
 %
-% Las primeras columnas de la matriz $P$ suelen ser varios órdenes de
-% magnitud mayor a las demás, ya que corresponden a los ambientes _Hogar_,
+% Las primeras columnas de la matriz $P$ suelen ser varios ï¿½rdenes de
+% magnitud mayor a las demï¿½s, ya que corresponden a los ambientes _Hogar_,
 % _Trabajo_ y _Estudios_. Para comparar mejor los tiempos invertidos en los
 % otros ambientes es posible quitar las primeras columnas de la
-% visualización. |quitar_columnas| es el número de columnas eliminadas.
+% visualizaciï¿½n. |quitar_columnas| es el nï¿½mero de columnas eliminadas.
 
 tomar_log = false;
 quitar_columnas = 0;
