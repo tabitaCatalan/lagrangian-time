@@ -23,7 +23,7 @@ Se busca separar a la población en base a varios criterios:
 
 ### Nivel Socioeconómico
 
-Hay varias formas de elegirlo.Se plantean las siguientes posibilidades:
+Hay varias formas de elegirlo. Se plantean las siguientes posibilidades:
 - Usar la columna `TramoIngresoFinal` de la tabla `Persona`, que asigna un valor entre 1 y 6 a cada uno de los encuestados en base a su ingreso. Esto NO es un buen indicador, pues una gran proporción de la población queda sin clasificar (tramo 0): quienes no reciben ingresos. Esto incluye a una gran cantidad de estudiantes y amas de casa.
 - **Ingreso per cápita:** Se considera el ingreso del hogar (columna `IngresoHogar` de la tabla `Hogar`) dividido por el número de habitantes del hogar (columna `NumPer` de la tabla `Hogar`). Haciendo un ranking de ese ingreso, se separa a la población en 3 tramos:
 
@@ -46,13 +46,24 @@ Tramo | Tasa mínima | Tasa máxima
 2   | 5%    | <10%
 3   | 0%    | <5%
 
-- **IPS:** Se usa el índice de prioridad social (ver descripción de los datos para más detalles). Se separa a la población en 3 tramos:
+- **IPS:** Se usa el índice de prioridad social (ver descripción de los datos para más detalles).
+<!-- Se separa a la población en 3 tramos:
 
 Tramo | IPS mínimo | IPS máximo
 --- | ---   |---
 1   | 72    | ∞
 2   | 58    | <72
 3   | 0    | <58
+-->
+Se separa a la población en 5 tramos. Ver Issue #9 :
+
+Tramo | IPS mínimo | IPS máximo
+--- | ---    |---
+1   | >77.39 | ∞
+2   | >71.36 | 77.39
+3   | >64.37 | 71.36 
+4   | >37.36 | 64.37
+4   | >6... | 37.36
 
 Para generar los tramos a los que pertenece cada persona en cada uno de los criterios se usa la consulta `clases-query.sql`.
 
