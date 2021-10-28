@@ -6,7 +6,7 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     %   si es verdadero, entonces la clasificacion considera el nivel
     %   socioeconomico.
     % - tipo_nvl: str
-    %   Tipo de nvl socioeconomico usado. Las opciones son:
+    %   Tipo de nvl socioeconomico usado. Ver mas detalles abajo. Las opciones son:
     %   - 'promedio': considera el ingreso per capita por hogar (suma de los
     %      ingresos de todos los integrantes del grupo familiar, dividido
     %      en el total de integrantes)
@@ -49,6 +49,9 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     % 1     | 1,2
     % 2     | 3,4
     % 3     | 5,6
+    % 
+    % El tipo 'pobreza' considera 3 grupos (1 el mas pobre y 5 el mas rico).
+    % El tipo 'ips' considera 5 grupos (1 el mas pobre y 5 el mas rico), e ignora la edad y el sexo.
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Leer base de datos
     % Se lee la base de datos y se guarda como tabla.
@@ -81,12 +84,18 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
     
     if considerar_nvl_econo
 
-        if strcmp(tipo_nvl, 'ips') || strcmp(tipo_nvl, 'pobreza')
-            if strcmp(tipo_nvl, 'ips')
-                col_tramo = 12; 
-            elseif strcmp(tipo_nvl, 'pobreza')
-                col_tramo = 14;
-            end
+        %if strcmp(tipo_nvl, 'ips') || strcmp(tipo_nvl, 'pobreza')
+        if strcmp(tipo_nvl, 'ips')
+            col_tramo = 12; 
+            
+            % 1 el mas pobre, 5 el mas rico 
+            tramo1 = (Clases(:,col_tramo)==1);
+            tramo2 = (Clases(:,col_tramo)==2);
+            tramo3 = (Clases(:,col_tramo)==3);
+            tramo4 = (Clases(:,col_tramo)==4);
+            tramo5 = (Clases(:,col_tramo)==5);
+        elseif strcmp(tipo_nvl, 'pobreza')
+            col_tramo = 14;
             tramo1 = (Clases(:,col_tramo)==1);
             tramo2 = (Clases(:,col_tramo)==2);
             tramo3 = (Clases(:,col_tramo)==3);
@@ -105,37 +114,53 @@ function [nclases, numeros_clase, tamano_clases, class_names, ...
         end
 
         %% Definir clases
-        numeros_clase(joven & tramo1 & hombre) = 1;
-        numeros_clase(joven & tramo1 & mujer) = 2;
-        numeros_clase(joven & tramo2 & hombre) = 3;
-        numeros_clase(joven & tramo2 & mujer) = 4;
-        numeros_clase(joven & tramo3 & hombre) = 5;
-        numeros_clase(joven & tramo3 & mujer) = 6;
-        numeros_clase(adulto & tramo1 & hombre) = 7;
-        numeros_clase(adulto & tramo1 & mujer) = 8;
-        numeros_clase(adulto & tramo2 & hombre) = 9;
-        numeros_clase(adulto & tramo2 & mujer) = 10;
-        numeros_clase(adulto & tramo3 & hombre) = 11;
-        numeros_clase(adulto & tramo3 & mujer) = 12;
-        numeros_clase(mayor & tramo1 & hombre) = 13;
-        numeros_clase(mayor & tramo1 & mujer) = 14;
-        numeros_clase(mayor & tramo2 & hombre) = 15;
-        numeros_clase(mayor & tramo2 & mujer) = 16;
-        numeros_clase(mayor & tramo3 & hombre) = 17;
-        numeros_clase(mayor & tramo3 & mujer) = 18;
-        class_names = {...
-            'MJovenT1', 'FJovenT1',...
-            'MJovenT2', 'FJovenT2',...
-            'MJovenT3', 'FJovenT3',...
-            'MAdultoT1', 'FAdultaT1',...
-            'MAdultoT2', 'FAdultaT2',...
-            'MAdultoT3', 'FAdultaT3',...
-            'MMayorT1', 'FMayorT1',...
-            'MMayorT2', 'FMayorT2',...
-            'MMayorT3', 'FMayorT3',...
-            };
-        %%
-        nclases = 18;
+        if strcmp(tipo_nvl, 'ips')
+            numeros_clase(tramo1) = 1;
+            numeros_clase(tramo2) = 2;
+            numeros_clase(tramo3) = 3;
+            numeros_clase(tramo4) = 4;
+            numeros_clase(tramo5) = 5;
+            class_names = {...
+                'Bajo', 'MedioBajo',...
+                'Medio', 'MedioAlto',...
+                'Alto', ...
+                };
+            %%
+            nclases = 5;
+        else 
+
+            numeros_clase(joven & tramo1 & hombre) = 1;
+            numeros_clase(joven & tramo1 & mujer) = 2;
+            numeros_clase(joven & tramo2 & hombre) = 3;
+            numeros_clase(joven & tramo2 & mujer) = 4;
+            numeros_clase(joven & tramo3 & hombre) = 5;
+            numeros_clase(joven & tramo3 & mujer) = 6;
+            numeros_clase(adulto & tramo1 & hombre) = 7;
+            numeros_clase(adulto & tramo1 & mujer) = 8;
+            numeros_clase(adulto & tramo2 & hombre) = 9;
+            numeros_clase(adulto & tramo2 & mujer) = 10;
+            numeros_clase(adulto & tramo3 & hombre) = 11;
+            numeros_clase(adulto & tramo3 & mujer) = 12;
+            numeros_clase(mayor & tramo1 & hombre) = 13;
+            numeros_clase(mayor & tramo1 & mujer) = 14;
+            numeros_clase(mayor & tramo2 & hombre) = 15;
+            numeros_clase(mayor & tramo2 & mujer) = 16;
+            numeros_clase(mayor & tramo3 & hombre) = 17;
+            numeros_clase(mayor & tramo3 & mujer) = 18;
+            class_names = {...
+                'MJovenT1', 'FJovenT1',...
+                'MJovenT2', 'FJovenT2',...
+                'MJovenT3', 'FJovenT3',...
+                'MAdultoT1', 'FAdultaT1',...
+                'MAdultoT2', 'FAdultaT2',...
+                'MAdultoT3', 'FAdultaT3',...
+                'MMayorT1', 'FMayorT1',...
+                'MMayorT2', 'FMayorT2',...
+                'MMayorT3', 'FMayorT3',...
+                };
+            %%
+            nclases = 18;
+        end
     else 
         numeros_clase(joven & hombre) = 1;
         numeros_clase(joven & mujer) = 2;

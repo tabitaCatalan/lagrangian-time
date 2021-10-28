@@ -26,10 +26,18 @@ END AS tramo_ingreso_promedio,
 Persona.TramoIngresoFinal AS tramo_ingreso_final_ppersona,
 Maximo.maximo AS tramo_max,
 IPS.ips AS ips,
-CASE
+/*CASE
     WHEN IPS.ips >= 72 THEN 1
     WHEN IPS.ips >= 58 AND IPS.ips < 72 THEN 2
     WHEN IPS.ips < 58 THEN 3
+END AS tramo_ips,*/
+/*[37.36, 64.37, 71.36, 77.39]*/
+CASE
+    WHEN IPS.ips > 77.39 THEN 1
+    WHEN IPS.ips > 71.36 AND IPS.ips <= 77.39 THEN 2
+    WHEN IPS.ips > 64.37 AND IPS.ips <= 71.36 THEN 3
+    WHEN IPS.ips > 37.36 AND IPS.ips <= 64.37 THEN 4
+    WHEN IPS.ips <= 37.36 THEN 5
 END AS tramo_ips,
 TasaPobreza.p100_pobreza as tasa_pobreza, 
 CASE
